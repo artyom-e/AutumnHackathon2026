@@ -3,7 +3,7 @@
   const H = Hospital;
   const storageKey = 'hospital-bug-mvp-v1';
   const stages = ['intro', 'route1', 'dialogue', 'route2', 'puzzle', 'route3', 'handoff', 'testing', 'complete'];
-  const freshState = () => ({ stage: 'intro', question: 0, order: [...H.initialOrder], branches: { schedule: '', available: '', cancel: '' }, testDone: [] });
+  const freshState = () => ({ stage: 'intro', question: 0, order: [...H.initialOrder], branches: { schedule: '', available: '', cancel: '' }, flowSlots: Array(5).fill(null), testDone: [] });
   let state = freshState();
   let storageAvailable = true;
   try {
@@ -12,6 +12,7 @@
       state = { ...state, ...saved };
       state.question = Math.max(0, Math.min(4, Number.isInteger(saved.question) ? saved.question : 0));
       state.order = Array.isArray(saved.order) && saved.order.length === 5 && new Set(saved.order).size === 5 && saved.order.every(id => Object.hasOwn(H.blocks, id)) ? saved.order : [...H.initialOrder];
+      if (!Array.isArray(saved.flowSlots) || saved.flowSlots.length !== 5) state.flowSlots = saved.stage === 'puzzle' ? [...state.order] : Array(5).fill(null);
       state.branches = { ...freshState().branches, ...(saved.branches && typeof saved.branches === 'object' ? saved.branches : {}) };
       state.testDone = Array.isArray(saved.testDone) ? H.scenarios.filter(item => saved.testDone.includes(item.id)).map(item => item.id) : [];
     }
@@ -28,6 +29,10 @@
   const speaker = (name, role, initials) => `<div class="speaker"><div class="portrait">${initials}</div><div><strong>${name}</strong><small>${role}</small></div></div>`;
   const game = new H.Game(document.getElementById('game'), level => transition(['dialogue', 'puzzle', 'handoff'][level]));
   H.appState = state;
+  const designer = new H.Designer({
+    overlay, getState: () => state, save, showModal,
+    onFinish: () => transition('route3'), onNotebook: openNotebook,
+  });
 
   function save() {
     H.appState = state;
@@ -45,16 +50,21 @@
   }
 
   function showModal(screen, html, wide = false) {
+    document.body.classList.remove('designer-open');
+    if (overlay.parentElement !== document.getElementById('canvas-wrap')) document.getElementById('canvas-wrap').appendChild(overlay);
+    overlay.classList.remove('design-overlay', 'dragging-block');
     currentScreen = screen;
     game.paused = true;
     game.clearInput();
     game.setPrompt('');
     overlay.hidden = false;
     overlay.innerHTML = `<section class="modal${wide ? ' wide' : ''}" role="dialog" aria-modal="true" aria-labelledby="modal-title">${html}</section>`;
-    overlay.querySelector('button:not([disabled]), select')?.focus({ preventScroll: true });
+    overlay.querySelector('button:not([disabled]), select, summary')?.focus({ preventScroll: true });
   }
 
   function resume() {
+    document.body.classList.remove('designer-open');
+    if (overlay.parentElement !== document.getElementById('canvas-wrap')) document.getElementById('canvas-wrap').appendChild(overlay);
     currentScreen = '';
     overlay.hidden = true;
     overlay.innerHTML = '';
@@ -104,7 +114,33 @@
     if (state.question >= 4 && !feedback) return renderRequirementsSummary();
     const questionIndex = feedback?.correct ? state.question - 1 : state.question;
     const question = H.questions[questionIndex];
-    showModal('dialogue', `<div class="modal-eyebrow">СБОР ТРЕБОВАНИЙ · ВОПРОС ${questionIndex + 1} / 4</div><div class="dialogue-progress">${H.questions.map((_, index) => `<span class="${index < questionIndex ? 'done' : index === questionIndex ? 'active' : ''}"></span>`).join('')}</div>${speaker('Елена Сергеевна', 'Руководитель регистратуры · твой заказчик', 'Е')}<h2 id="modal-title">Понять. Уточнить. Записать.</h2><p class="speech">«${question.speech}»</p><div class="question-label">${question.question}</div><div class="answers">${question.options.map((option, index) => `<button class="answer ${feedback?.selected === index ? feedback.correct ? 'correct' : 'wrong' : ''}" data-action="answer" data-index="${index}" ${feedback?.correct ? 'disabled' : ''}><span>${feedback?.correct && index === question.correct ? '✓' : index + 1}</span>${option}</button>`).join('')}</div>${feedback ? `<div class="feedback ${feedback.correct ? '' : 'error'}">${feedback.correct ? `<strong>${H.requirements[questionIndex].id} добавлено в ТЗ.</strong> ${H.requirements[questionIndex].text}` : question.hint}</div>` : ''}${feedback?.correct ? `<div class="modal-actions">${button(state.question === 4 ? 'Посмотреть ТЗ →' : 'Следующий вопрос →', 'next-question')}</div>` : ''}`);
+    const explanation = feedback ? question.explanations[feedback.selected] : '';
+    const feedbackHtml = !feedback ? '' : `
+      <div class="feedback client-feedback ${feedback.correct ? '' : 'error'}" role="status">
+        <strong>${feedback.correct ? 'Верно!' : 'Пока не совсем.'}</strong>
+        <p>${explanation}</p>
+        ${feedback.correct ? `<div class="accepted-requirement"><strong>${H.requirements[questionIndex].id} добавлено в ТЗ</strong></div>` : '<span class="retry-label">Попробуй ещё раз.</span>'}
+      </div>`;
+    showModal('dialogue', `<div class="client-dialogue">
+      <div class="modal-eyebrow">ВСТРЕЧА С ЗАКАЗЧИКОМ · ЗАДАЧА ${questionIndex + 1} / 4</div>
+      <div class="dialogue-progress">${H.questions.map((_, index) => `<span class="${index < questionIndex ? 'done' : index === questionIndex ? 'active' : ''}"></span>`).join('')}</div>
+      <h2 id="modal-title">Объясни задачу программисту.</h2>
+      <p class="client-instruction">Выбери ответ, который объясняет, что должна делать программа.</p>
+      <div class="client-layout">
+        <div class="client-brief">
+          ${speaker('Елена Сергеевна', 'Руководитель регистратуры', 'Е')}
+          <div class="client-section-label">ЗАКАЗЧИК ХОЧЕТ</div><h3>${question.goal}</h3>
+          <p class="speech">«${question.speech}»</p>
+        </div>
+        <div class="client-options"><div class="question-label">${question.question}</div>
+          <div class="answers">${question.options.map((option, index) => `<button class="answer ${feedback?.selected === index ? feedback.correct ? 'correct' : 'wrong' : ''}" data-action="answer" data-index="${index}" ${feedback?.correct ? 'disabled' : ''}><span>${feedback?.correct && index === question.correct ? '✓' : index + 1}</span>${option}</button>`).join('')}</div>
+        </div>
+      </div>
+      ${feedbackHtml}
+      ${feedback?.correct ? `<div class="modal-actions">${button(state.question === 4 ? 'Посмотреть ТЗ →' : 'Дальше →', 'next-question')}</div>` : ''}
+    </div>`, true);
+    // Keep the explanation visible when the dialog needs scrolling on a small screen.
+    if (feedback) overlay.querySelector('.client-feedback')?.scrollIntoView({ block: 'nearest' });
   }
 
   function requirementCards() {
@@ -112,13 +148,10 @@
   }
 
   function renderRequirementsSummary() {
-    showModal('dialogue', `<div class="modal-eyebrow">ДОКУМЕНТ СОБРАН · ТЗ № 001</div><h2 id="modal-title">Теперь проблема стала задачей.</h2><p>Четыре жалобы превратились в четыре правила системы. С ними можно проектировать решение.</p>${requirementCards()}<div class="modal-actions">${button('В кабинет аналитика →', 'to-office')}</div>`);
+    showModal('dialogue', `<div class="modal-eyebrow">ДОКУМЕНТ СОБРАН · ТЗ № 001</div><h2 id="modal-title">Теперь программист знает, что делать!</h2><p>Ты превратил пожелания заказчика в четыре правила для программы. Это и есть часть работы системного аналитика.</p>${requirementCards()}<div class="modal-actions">${button('В кабинет аналитика →', 'to-office')}</div>`);
   }
 
-  function renderPuzzle(feedback = null) {
-    const options = (selected, items) => `<option value="">Выбери действие…</option>${items.map(([value, name]) => `<option value="${value}" ${selected === value ? 'selected' : ''}>${name}</option>`).join('')}`;
-    showModal('puzzle', `<div class="modal-eyebrow">ПРОЕКТИРОВАНИЕ · ТВОЙ РАБОЧИЙ КОМПЬЮТЕР</div><h2 id="modal-title">Собери логику записи.</h2><p>Стрелками расставь действия по порядку. Для отказов и отмены выбери отдельные ветки — пригодятся правила из ТЗ.</p><div class="puzzle-layout"><div><div class="puzzle-subtitle">ОСНОВНОЙ ПУТЬ · ПРОВЕРКИ ПРОЙДЕНЫ ↓</div><div class="algorithm-list">${state.order.map((id, index) => `<div class="algorithm-block"><span class="block-number">${index + 1}</span><span class="block-name">${H.blocks[id].name}<span class="block-tag">${H.blocks[id].tag}</span></span><div class="block-arrows"><button data-action="move" data-index="${index}" data-direction="-1" aria-label="Переместить ${H.blocks[id].name} выше" ${index === 0 ? 'disabled' : ''}>↑</button><button data-action="move" data-index="${index}" data-direction="1" aria-label="Переместить ${H.blocks[id].name} ниже" ${index === state.order.length - 1 ? 'disabled' : ''}>↓</button></div></div>`).join('')}</div></div><div><div class="puzzle-subtitle">АЛЬТЕРНАТИВНЫЕ ВЕТКИ · А ЕСЛИ НЕТ?</div><div class="branch-box"><div class="branch-row"><label for="branch-schedule">FR-02 · Врач работает? → Нет</label><select id="branch-schedule" data-branch="schedule">${options(state.branches.schedule, [['book', 'Всё равно создать запись'], ['off-hours', 'Отказать: врач не работает'], ['occupied', 'Сообщить: слот занят']])}</select></div><div class="branch-row"><label for="branch-available">FR-01 · Слот свободен? → Нет</label><select id="branch-available" data-branch="available">${options(state.branches.available, [['occupied', 'Отказать: время занято'], ['book', 'Создать ещё одну запись'], ['off-hours', 'Сообщить: врач не работает']])}</select></div><div class="branch-row"><label for="branch-cancel">FR-03 · Пациент отменяет запись</label><select id="branch-cancel" data-branch="cancel">${options(state.branches.cancel, [['keep', 'Оставить слот занятым'], ['release', 'Отменить и освободить слот'], ['all', 'Удалить все записи врача']])}</select></div></div><p class="small-help">При отказе основной путь останавливается. Сообщение об ошибке — отдельная ветка.</p></div></div>${feedback ? `<div class="feedback${feedback.ok ? '' : ' error'}">${feedback.message}</div>` : ''}<div class="modal-actions">${feedback?.ok ? button('Передать решение Максу →', 'to-developer', 'dark') : button('Проверить алгоритм', 'check-algorithm')}</div>`, true);
-  }
+  function renderPuzzle() { designer.render(); }
 
   function renderHandoff() {
     showModal('handoff', `<div class="modal-eyebrow">ПЕРЕДАЧА РЕШЕНИЯ · IT-ОТДЕЛ</div>${speaker('Макс', 'Программист больницы', 'М')}<h2 id="modal-title">Вот теперь всё понятно.</h2><p class="speech">«Ты собрал требования и схему: проверяем расписание и доступность, создаём запись, отправляем подтверждение. При отмене освобождаем слот. Реализую эти правила!»</p><p>Проверим вместе, как работает исправленная система: успешная запись, конфликт, нерабочее время и отмена.</p><div class="modal-actions">${button('Запустить проверку →', 'start-testing')}</div>`);
@@ -187,17 +220,6 @@
     }
     if (action === 'next-question') renderDialogue();
     if (action === 'to-office') transition('route2');
-    if (action === 'move') {
-      const index = Number(target.dataset.index);
-      const destination = index + Number(target.dataset.direction);
-      if (destination < 0 || destination >= state.order.length) return;
-      [state.order[index], state.order[destination]] = [state.order[destination], state.order[index]];
-      save();
-      renderPuzzle();
-      overlay.querySelectorAll('.algorithm-block')[destination].querySelector(`button[data-direction="${target.dataset.direction}"]:not([disabled])`)?.focus({ preventScroll: true });
-    }
-    if (action === 'check-algorithm') renderPuzzle(H.validateAlgorithm(state.order, state.branches));
-    if (action === 'to-developer' && H.validateAlgorithm(state.order, state.branches).ok) transition('route3');
     if (action === 'start-testing') { restoreSystem(); transition('testing'); }
     if (action === 'scenario') {
       const scenario = H.scenarios.find(item => item.id === target.dataset.id);
@@ -211,24 +233,16 @@
     if (action === 'finish' && state.testDone.length === 5) { transition('complete'); toast('Миссия выполнена. Отличная работа, аналитик!'); }
     if (action === 'notebook') openNotebook();
     if (action === 'back') renderScreen(returnScreen);
-    if (action === 'replay') { state = freshState(); system = null; testResults = {}; save(); renderStage(); }
+    if (action === 'replay') { designer.resetSession(); state = freshState(); system = null; testResults = {}; save(); renderStage(); }
   });
 
-  overlay.addEventListener('change', event => {
-    const branch = event.target.dataset.branch;
-    if (branch) {
-      state.branches[branch] = event.target.value;
-      save();
-      const feedback = overlay.querySelector('.feedback');
-      if (feedback) { feedback.remove(); overlay.querySelector('.modal-actions').innerHTML = button('Проверить алгоритм', 'check-algorithm'); }
-    }
-  });
   document.getElementById('notebook-button').addEventListener('click', () => { if (!['notebook', 'help', 'restart'].includes(currentScreen)) openNotebook(); });
   document.getElementById('help-button').addEventListener('click', () => { if (!['notebook', 'help', 'restart'].includes(currentScreen)) openHelp(); });
   document.getElementById('restart-button').addEventListener('click', () => { if (!['notebook', 'help', 'restart'].includes(currentScreen)) openRestart(); });
   document.getElementById('demo-select').addEventListener('change', event => {
     const value = event.target.value;
     if (!value) return;
+    designer.resetSession();
     state = freshState(); system = null; testResults = {};
     if (value === 'platform') state.stage = 'route1';
     if (value === 'dialogue') state.stage = 'dialogue';
@@ -241,7 +255,7 @@
     if (overlay.hidden) return;
     if (event.code === 'Escape' && ['notebook', 'help', 'restart'].includes(currentScreen)) renderScreen(returnScreen);
     if (event.code !== 'Tab') return;
-    const elements = [...overlay.querySelectorAll('button:not([disabled]), select')];
+    const elements = [...overlay.querySelectorAll('button:not([disabled]), select, summary')];
     if (!elements.length) return;
     const first = elements[0], last = elements[elements.length - 1];
     if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }

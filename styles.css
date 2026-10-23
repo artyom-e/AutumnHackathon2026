@@ -1324,6 +1324,96 @@ select {
     font-size:8px
   }
 }
+.client-dialogue .client-instruction {
+  font-size: 11px;
+  margin-bottom: 18px;
+}
+.client-layout {
+  display: grid;
+  grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr);
+  gap: 20px;
+}
+.client-brief {
+  padding: 14px;
+  background: #e6e9dc;
+  border: 1px solid #ced5c6;
+  border-radius: 6px;
+}
+.client-section-label {
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  color: #7d8066;
+}
+.client-brief h3 {
+  font-size: 14px;
+  line-height: 1.5;
+  margin: 6px 0 10px;
+}
+.client-dialogue .speech {
+  font-size: 12px;
+  line-height: 1.7;
+}
+.client-dialogue .answer {
+  font-size: 11px;
+  line-height: 1.65;
+  padding: 12px;
+  align-items: flex-start;
+}
+.client-options .question-label {
+  margin-top: 0;
+  line-height: 1.6;
+}
+.client-clarification {
+  padding-top: 12px;
+  border-top: 1px solid #c7d0be;
+}
+.client-clarification summary {
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 650;
+  color: #476c60;
+}
+.client-clarification summary:focus-visible {
+  outline: 2px solid #b47652;
+  outline-offset: 4px;
+}
+.client-clarification p {
+  margin: 10px 0 0;
+  font-size: 11px;
+}
+.client-feedback p {
+  font-size: 11px;
+  color: inherit;
+  margin: 5px 0 0;
+}
+.client-lesson {
+  margin-top: 9px;
+  font-size: 10px;
+  font-style: italic;
+}
+.accepted-requirement, .acceptance-example {
+  border-top: 1px solid #bdceb2;
+  margin-top: 12px;
+  padding-top: 10px;
+}
+.accepted-requirement strong, .acceptance-example strong {
+  font-size: 10px;
+}
+.retry-label {
+  display: block;
+  margin-top: 8px;
+  font-size: 10px;
+}
+@media(max-width:650px) {
+  .client-layout {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
+  }
+  .client-brief {
+    padding: 12px;
+  }
+}
 @media(prefers-reduced-motion:reduce) {
   *,*:before,*:after {
     transition:none!important;
