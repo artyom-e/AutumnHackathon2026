@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#131e2c">
+  <meta name="description" content="Баг в больнице — короткая игра о работе системного аналитика. Собери требования, спроектируй алгоритм и помоги наладить запись пациентов.">
+  <title>Баг в больнице · MVP</title>
+  <link rel="stylesheet" href="styles.css">
+  <script defer src="src/data.js"></script>
+  <script defer src="src/logic.js"></script>
+  <script defer src="src/game.js"></script>
+  <script defer src="src/app.js"></script>
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <a class="brand" href="index.html" aria-label="Баг в больнице — главная"><span class="brand-mark">✚</span><span>БАГ В БОЛЬНИЦЕ<span class="brand-sub">маленькое приключение системного аналитика</span></span></a>
+      <div class="header-actions"><span class="prototype-badge"><span></span> ИГРАЕМ В MVP</span><button class="icon-button" id="help-button" aria-label="Управление и правила" title="Управление">?</button><button class="icon-button" id="restart-button" aria-label="Начать заново" title="Начать заново">↻</button></div>
+    </header>
+
+    <main>
+      <div class="page-heading"><div><p class="eyebrow">ПЕРВЫЙ РАБОЧИЙ ДЕНЬ / МИССИЯ 001</p><h1>Один баг. <span>Много проблем.</span></h1><p class="page-description">В расписании хаос. Кажется, здесь нужен аналитик — то есть ты.</p></div><div class="shift-label"><span class="live-dot"></span><span>Городская больница № 8<small id="hospital-status">Система записи: сбой</small></span></div></div>
+
+      <div class="play-layout">
+        <section class="game-area" aria-label="Игровое поле">
+          <div class="scene-toolbar"><span><span class="scene-dot"></span><span id="scene-title">01 / БОЛЬНИЧНЫЙ КОРИДОР</span></span><span class="scene-hint" id="scene-objective">Доберись до регистратуры →</span></div>
+          <div class="canvas-wrap" id="canvas-wrap">
+            <canvas id="game" width="960" height="540" tabindex="0" aria-label="Платформер. A и D или стрелки — движение, пробел — прыжок, E — взаимодействие."></canvas>
+            <div class="game-vignette" aria-hidden="true"></div>
+            <div class="location-stamp"><span>БОЛЬНИЦА № 8</span><small id="floor-label">1 ЭТАЖ · РЕГИСТРАТУРА</small></div>
+            <div class="interaction-prompt" id="interaction-prompt" hidden><kbd>E</kbd><span></span></div>
+            <div class="scene-notice" id="scene-notice" aria-live="polite"></div>
+            <div class="overlay" id="overlay" hidden></div>
+          </div>
+          <div class="game-controls"><div><span><kbd>A</kbd><kbd>D</kbd> идти</span><span><kbd>Пробел</kbd> прыгать</span><span><kbd>E</kbd> взаимодействовать</span></div><button class="text-button" id="notebook-button">▤ Техническое задание <span id="requirement-count">0/4</span></button></div>
+          <div class="touch-controls" aria-label="Сенсорное управление"><div><button data-control="left" aria-label="Идти влево">←</button><button data-control="right" aria-label="Идти вправо">→</button></div><div><button data-control="jump" aria-label="Прыжок">↑</button><button data-control="interact" aria-label="Взаимодействовать">E</button></div></div>
+        </section>
+
+        <aside class="mission-panel"><div class="mission-heading"><span class="eyebrow">ТВОЯ МИССИЯ</span><span class="mission-number">#001</span></div><h2>Починить запись.<br>Начать с вопросов.</h2><p class="mission-description">Разберись, как всё должно работать, и передай решение программисту.</p><ol class="quest-list" id="quest-list"></ol><div class="mission-progress"><div><span>Прогресс миссии</span><strong id="progress-label">0%</strong></div><div class="progress-track"><span id="progress-bar"></span></div></div><div class="analyst-tip"><span>✦</span><p id="analyst-tip">Хороший аналитик сначала понимает проблему, а уже потом предлагает решение.</p></div><div class="your-role"><div class="mini-avatar">А</div><div><strong>Ты — системный аналитик</strong><span>Соединяешь людей и технологии</span></div></div></aside>
+      </div>
+
+      <footer class="bottom-bar"><span><span class="save-dot"></span><span id="save-status">Прогресс сохраняется в этом браузере</span></span><div class="demo-actions"><label for="demo-select">Быстрый показ</label><select id="demo-select" aria-label="Быстрый переход к механике"><option value="">Выбрать механику…</option><option value="platform">Платформер</option><option value="dialogue">Диалог с заказчиком</option><option value="puzzle">Конструктор алгоритма</option><option value="testing">Проверка системы</option></select></div></footer>
+    </main>
+  </div>
+  <div class="toast" id="toast" role="status"></div>
+</body>
+</html>
