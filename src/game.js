@@ -103,33 +103,54 @@ Hospital.Game = class {
     if (locationStamp) locationStamp.hidden = true;
   }
 
-  clearInput() { this.keys.clear(); this.jumpBuffer = 0; }
+  clearInput() {
+    this.keys.clear();
+    this.keyboardKeys?.clear();
+    this.touchPointers?.clear();
+    this.jumpBuffer = 0;
+    document.querySelectorAll('[data-control].held').forEach(button => button.classList.remove('held'));
+  }
 
   bindControls() {
+    this.keyboardKeys = new Set();
+    this.touchPointers = new Map();
     window.addEventListener('keydown', event => {
       if (this.paused || /INPUT|SELECT|TEXTAREA|BUTTON/.test(event.target.tagName)) return;
       const code = event.code;
       if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'Space', 'KeyW', 'KeyA', 'KeyD', 'KeyE'].includes(code)) event.preventDefault();
       if (this.level > 0 && ['ArrowDown', 'KeyS'].includes(code)) event.preventDefault();
       this.keys.add(code);
+      this.keyboardKeys.add(code);
       if (!event.repeat && ['Space', 'ArrowUp', 'KeyW'].includes(code)) this.jumpBuffer = .14;
       if (!event.repeat && code === 'KeyE') this.interact();
     });
-    window.addEventListener('keyup', event => this.keys.delete(event.code));
+    window.addEventListener('keyup', event => {
+      this.keyboardKeys.delete(event.code);
+      if (![...this.touchPointers.values()].some(pointer => pointer.code === event.code)) this.keys.delete(event.code);
+    });
     window.addEventListener('blur', () => this.clearInput());
     document.addEventListener('visibilitychange', () => { this.clearInput(); this.lastTime = 0; });
     this.canvas.addEventListener('pointerdown', () => this.canvas.focus({ preventScroll: true }));
     document.querySelectorAll('[data-control]').forEach(button => {
       const control = button.dataset.control;
-      const code = { left: 'KeyA', right: 'KeyD', jump: 'Space' }[control];
+      const code = { left: 'KeyA', right: 'KeyD', down: 'KeyS', jump: 'Space' }[control];
       button.addEventListener('pointerdown', event => {
         event.preventDefault();
         if (this.paused) return;
         button.setPointerCapture(event.pointerId);
+        this.touchPointers.set(event.pointerId, { code, button });
+        button.classList.add('held');
         if (control === 'interact') this.interact();
         else { this.keys.add(code); if (control === 'jump') this.jumpBuffer = .14; }
       });
-      ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(type => button.addEventListener(type, () => this.keys.delete(code)));
+      ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(type => button.addEventListener(type, event => {
+        this.touchPointers.delete(event.pointerId);
+        if (![...this.touchPointers.values()].some(pointer => pointer.button === button)) button.classList.remove('held');
+        if (!this.keyboardKeys.has(code) && ![...this.touchPointers.values()].some(pointer => pointer.code === code)) this.keys.delete(code);
+      }));
+    });
+    document.addEventListener('contextmenu', event => {
+      if (event.target.closest('#game, .touch-controls, .design-workspace, .hud-actions')) event.preventDefault();
     });
   }
 
@@ -359,10 +380,7 @@ Hospital.Game = class {
     this.text('ЗАПИСЬ К ВРАЧУ', 945, 154, 10, '#56776b', 'center');
     this.text(Hospital.appState?.stage === 'complete' ? 'СИСТЕМА РАБОТАЕТ' : '14:00   ×   3 ПАЦИЕНТА', 945, 175, 10, Hospital.appState?.stage === 'complete' ? '#487760' : '#b06954', 'center');
     this.puddles.forEach(puddle => {
-      this.rect(puddle.x + 8, 461, puddle.w - 16, 8, '#78aaa5');
-      this.rect(puddle.x, 465, puddle.w, 5, '#6b9e9c');
-      this.rect(puddle.x + 16, 463, 22, 2, '#bbd5c5');
-      this.rect(puddle.x + 47, 467, 17, 2, '#a5c8b8');
+      this.puddleSurface(puddle);
       this.wetSign(puddle.x - 30, 435);
     });
     this.carts.forEach(cart => this.cart(cart));
@@ -528,13 +546,7 @@ Hospital.Game = class {
     this.receptionRailing(1640, 400, 540);
 
     this.puddles.forEach(puddle => {
-      this.rect(puddle.x, 463, puddle.w, 7, '#4c9293');
-      this.rect(puddle.x + 7, 460, puddle.w - 14, 5, '#80b7ac');
-      for (let dx = 17; dx < puddle.w - 30; dx += 67) {
-        const ripple = Math.round(Math.sin(this.time * 1.6 + dx) * 3);
-        this.rect(puddle.x + dx + ripple, 462, 23, 2, '#bed4bc');
-        this.rect(puddle.x + dx + 12, 466, 32, 1, '#6aa79f');
-      }
+      this.puddleSurface(puddle);
       this.wetSign(puddle.x - 27, 435);
       this.wetSign(puddle.x + puddle.w + 10, 435);
     });
@@ -735,9 +747,7 @@ Hospital.Game = class {
     this.bankATM(this.goal - 36, 172);
     this.diagnosticMap.ladders.forEach(ladder => this.diagnosticLadder(ladder));
     this.puddles.forEach(puddle => {
-      this.rect(puddle.x, 463, puddle.w, 7, '#4c9293');
-      this.rect(puddle.x + 7, 460, puddle.w - 14, 5, '#80b7ac');
-      for (let dx = 17; dx < puddle.w - 30; dx += 67) this.rect(puddle.x + dx, 462, 23, 2, '#bed4bc');
+      this.puddleSurface(puddle);
       this.wetSign(puddle.x - 29, 435);
       this.wetSign(puddle.x + puddle.w + 11, 435);
     });
@@ -883,9 +893,7 @@ Hospital.Game = class {
     this.technicalConsole(1200, 362, 120);
     this.technicalHazard(807, 454, 260);
     this.puddles.forEach(puddle => {
-      this.rect(puddle.x, 463, puddle.w, 7, '#397a7b');
-      this.rect(puddle.x + 5, 461, puddle.w - 10, 4, '#619a90');
-      for (let dx = 14; dx < puddle.w - 30; dx += 49) this.rect(puddle.x + dx, 463, 21, 2, '#a5c5a6');
+      this.puddleSurface(puddle);
     });
 
     // An open shaft, lift and suspended walkways lead across the machinery hall.
@@ -956,6 +964,27 @@ Hospital.Game = class {
     this.rect(x, y + 4, w, 10, '#477b6d');
     this.rect(x + 5, y + 6, w - 10, 2, '#688e73');
     this.rect(x, y + 12, w, 4, '#0e2b2e');
+    this.platformEdge(x, y, w);
+  }
+
+  platformEdge(x, y, w) {
+    this.rect(x, y - 1, w, 1, '#264d4b');
+    this.rect(x, y, w, 2, '#e2e7bb');
+    this.rect(x, y + 2, 5, 3, '#d8b77d');
+    this.rect(x + w - 5, y + 2, 5, 3, '#d8b77d');
+  }
+
+  puddleSurface({ x, w }) {
+    // Keep the hazard footprint unchanged; emphasize water against the green floor.
+    this.rect(x, 463, w, 7, '#286e79');
+    this.rect(x + 5, 460, w - 10, 7, '#61b9ba');
+    this.rect(x + 10, 460, w - 20, 1, '#c5e8d6');
+    this.rect(x + 3, 467, w - 6, 2, '#3e8e9a');
+    for (let dx = 15; dx < w - 34; dx += 61) {
+      const ripple = Math.round(Math.sin(this.time * 1.6 + dx / 35) * 3);
+      this.rect(x + dx + ripple, 462, 24, 2, '#d4edda');
+      this.rect(x + dx + 12 - ripple, 465, 17, 1, '#b1ded0');
+    }
   }
 
   technicalFoundation({ x, y, w, h }) {
@@ -1116,12 +1145,14 @@ Hospital.Game = class {
       this.rect(x + 8, y + 9, w - 16, 2, '#95b69a');
       [12, w - 16].forEach(dx => this.rect(x + dx, y + 16, 4, 4, '#c6d5b3'));
       for (let dx = 60; dx < w - 50; dx += 10) this.rect(x + dx, y + 13, 4, 7, '#49776c');
+      this.platformEdge(x, y, w);
       return;
     }
     this.rect(x - 2, y, w + 4, 4, '#c5d8b3');
     this.rect(x, y + 4, w, 9, lift ? '#638f83' : '#4b8579');
     this.rect(x, y + 11, w, 3, '#234d4b');
     this.rect(x + 5, y + 5, w - 10, 2, '#8fb69b');
+    this.platformEdge(x, y, w);
     if (lift) {
       this.rect(x + 7, y - 14, w - 14, 14, '#5c8d7a');
       this.rect(x + 7, y - 14, w - 14, 3, '#d7d4a8');

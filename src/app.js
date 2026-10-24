@@ -313,12 +313,15 @@
   document.getElementById('notebook-button').addEventListener('click', () => { if (!['notebook', 'help', 'restart'].includes(currentScreen)) openNotebook(); });
   document.getElementById('help-button').addEventListener('click', () => { if (!['notebook', 'help', 'restart'].includes(currentScreen)) openHelp(); });
   document.getElementById('restart-button').addEventListener('click', () => { if (!['notebook', 'help', 'restart'].includes(currentScreen)) openRestart(); });
+  document.addEventListener('click', event => {
+    if (overlay.hidden && event.target.closest('[data-audio-toggle]')) game.canvas.focus({ preventScroll: true });
+  });
   document.addEventListener('keydown', event => {
     if (overlay.hidden) return;
     if (event.code === 'Enter' && activeConversation && !event.repeat && !event.target.closest?.('[data-audio-toggle]') && !/INPUT|TEXTAREA|SELECT/.test(event.target.tagName)) { event.preventDefault(); advanceConversation(); return; }
     if (event.code === 'Escape' && ['notebook', 'help', 'restart'].includes(currentScreen)) renderScreen(returnScreen);
     if (event.code !== 'Tab') return;
-    const elements = [...overlay.querySelectorAll('button:not([disabled]), input, select, summary')];
+    const elements = [...overlay.querySelectorAll('button:not([disabled]), input, select, summary')].filter(element => element.getClientRects().length);
     if (!elements.length) return;
     const first = elements[0], last = elements[elements.length - 1];
     if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }

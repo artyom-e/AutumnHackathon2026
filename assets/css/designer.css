@@ -70,7 +70,9 @@ body.designer-open { overflow: hidden; }
 .empty .node-target { font-size: 12px; color: #829173; }
 .node-remove { position: absolute; top: -9px; right: -9px; width: 20px; height: 20px; display: grid; place-items: center; border: 1px solid #88765c; border-radius: 1px; background: #f1e2c3; color: #825839; font-size: 15px; opacity: 0; }
 .flow-node:hover .node-remove, .flow-node:focus-within .node-remove { opacity: 1; }
-.flow-node.diamond { clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); border: 0; border-radius: 0; background: #a48954; padding: 2px; box-shadow: none; }
+.flow-node.diamond { border: 0; border-radius: 0; background: transparent; padding: 2px; box-shadow: none; }
+.flow-node.diamond::before { content: ''; position: absolute; inset: 0; z-index: -1; background: #a48954; clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); }
+.flow-node.diamond { isolation: isolate; }
 .flow-node.diamond .node-target { clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); background: var(--card-bg); padding: 12px 30px; gap: 4px; font-size: 12px; }
 .diamond .node-icon { display: none; }
 .flow-terminal { position: absolute; display: flex; align-items: center; justify-content: center; gap: 9px; border: 2px solid #8a9b77; border-radius: 2px; background: #e3e5cb; color: #5e765a; font: 700 12px "Courier New", monospace; box-shadow: 2px 2px 0 #cbd1b6; }
@@ -82,9 +84,9 @@ body.designer-open { overflow: hidden; }
 .wire-label { position: absolute; padding: 1px 5px; background: #fffdf0; color: #55764f; font: 700 11px/1.5 "Courier New", monospace; }
 .wire-label.no { color: #a76c50; }
 .flow-node.traced, .flow-terminal.traced, .flow-node.drop-hover { outline: 3px solid #bc8c47; outline-offset: 3px; }
-.flow-decision.traced, .flow-node.diamond.traced, .flow-node.diamond.drop-hover { background: #b37d30; filter: brightness(1.06); }
+.flow-decision.traced, .flow-node.diamond.traced::before, .flow-node.diamond.drop-hover::before { background: #b37d30; filter: brightness(1.06); }
 .flow-node.node-error { outline: 3px solid #aa664e; outline-offset: 3px; }
-.flow-node.diamond.node-error { background: #aa664e; padding: 3px; }
+.flow-node.diamond.node-error::before { background: #aa664e; }
 .dragging-block [data-slot] { outline: 2px dashed #be995d; outline-offset: 3px; }
 .design-feedback { padding: 11px 23px; border-bottom: 2px solid #adc19a; background: #dce8ce; color: #476847; font-size: 13px; line-height: 1.6; }
 .design-feedback.is-error { background: #efdfcb; border-color: #c19877; color: #8f5e44; }
@@ -97,9 +99,9 @@ body.designer-open { overflow: hidden; }
 .design-button.primary { min-width: 190px; background: #3d766c; color: #faf5df; border-color: #244448; box-shadow: 2px 2px 0 #244448; }
 .design-button.primary:hover { background: #477f70; }
 .difficulty-hard .palette-card, .difficulty-hard .flow-node.filled { --card-border: #7e8d75; --card-bg: #eeecd9; --card-ink: #627459; }
-.difficulty-hard .flow-node.diamond { background: #7e8d75; }
-.difficulty-hard .flow-node.diamond.node-error { background: #aa664e; }
-.difficulty-hard .flow-node.diamond.drop-hover { background: #b37d30; }
+.difficulty-hard .flow-node.diamond::before { background: #7e8d75; }
+.difficulty-hard .flow-node.diamond.node-error::before { background: #aa664e; }
+.difficulty-hard .flow-node.diamond.drop-hover::before { background: #b37d30; }
 .difficulty-hard .palette-items { gap: 10px; padding-top: 14px; }
 .difficulty-hard .palette-card { min-height: 56px; padding-top: 9px; padding-bottom: 9px; }
 @media (max-width: 1200px) {
@@ -155,4 +157,61 @@ body.designer-open { overflow: hidden; }
   .design-button { min-height: 41px; padding: 8px; font-size: 11px; }
   .design-button.primary { min-width: 0; white-space: normal; }
   .node-remove { opacity: 1; }
+}
+
+/* Phones use a vertical tree and a native card picker instead of HTML drag-and-drop. */
+.design-overlay:has(.compact-design) { padding: max(6px, env(safe-area-inset-top)) max(6px, env(safe-area-inset-right)) max(6px, env(safe-area-inset-bottom)) max(6px, env(safe-area-inset-left)); }
+.design-overlay .compact-design { width: 100%; height: 100%; grid-template-rows: 43px minmax(0, 1fr) auto; }
+.compact-design .design-header { padding: 0 10px; gap: 8px; }
+.compact-design .design-brand > span:last-child, .compact-design .design-user, .compact-design .window-pixels { display: none; }
+.compact-design .design-body { display: block; overflow-y: auto; overscroll-behavior: contain; }
+.compact-design .design-palette { display: none; }
+.compact-design .design-center { display: block; height: auto; }
+.compact-design .design-document { padding: 12px; gap: 8px; }
+.compact-design .design-document strong { font-size: 15px; }
+.compact-design .design-document small { font-size: 9px; }
+.compact-design .design-progress i { display: none; }
+.compact-design .design-instruction { padding: 10px 12px; font-size: 12px; }
+.compact-design .mobile-pan-hint { display: block; color: #805c34; font-size: 12px; margin-top: 6px; }
+.compact-design .flow-scroll { overflow: visible; }
+.compact-design .flow-canvas { min-width: 0; min-height: 0; height: auto; padding: 20px 14px; }
+.compact-main { max-width: 560px; margin: auto; border-left: 2px solid #91a586; padding-left: 12px; }
+.compact-design .flow-node, .compact-design .flow-decision, .compact-design .flow-terminal { position: relative; width: 100%; min-height: 54px; margin: 0 0 22px; }
+.compact-design .flow-node::after, .compact-design .flow-decision::after { content: '↓'; position: absolute; top: 100%; left: 50%; line-height: 22px; color: #52745d; }
+.compact-design .node-target { min-height: 64px; padding: 12px; font-size: 14px; }
+.compact-design .filled .node-target { padding-right: 44px; }
+.compact-design .node-remove { opacity: 1; top: 0; right: 0; width: 42px; height: 100%; min-height: 44px; border-width: 0 0 0 1px; font-size: 22px; }
+.compact-design .flow-node.diamond { border: 2px solid #a48954; padding: 0; background: var(--card-bg, #fffdf0); border-radius: 10px; }
+.compact-design .flow-node.diamond::before { display: none; }
+.compact-design .diamond .node-target { clip-path: none; background: none; }
+.compact-design .diamond .node-icon { display: grid; }
+.compact-design .flow-decision { clip-path: none; padding: 12px; border: 2px solid #a48954; border-radius: 10px; background: #efe0b8; font-size: 14px; }
+.compact-design .flow-decision::before { display: none; }
+.compact-branch { margin: 0 0 10px 22px; padding: 10px 0 0 12px; border-left: 2px solid #a48954; }
+.compact-label { display: block; margin-bottom: 10px; color: #79603b; font: 700 13px "Courier New", monospace; }
+.continue-label { margin: 0 0 14px; color: #416b50; }
+.compact-fork { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.compact-fork > div { min-width: 0; }
+.compact-fork .node-target { min-height: 110px; padding: 12px 6px; flex-direction: column; gap: 6px; font-size: 13px; overflow-wrap: anywhere; }
+.compact-fork .filled .node-target { padding: 12px 6px 46px; }
+.compact-fork .node-remove { top: auto; bottom: 0; height: 40px; min-height: 40px; width: 100%; border-width: 1px 0 0; }
+.compact-design .design-footer { display: grid; grid-template-columns: 1fr; padding: 8px; gap: 8px; }
+.compact-design .design-footer-note { display: none; }
+.compact-design .design-footer > .design-button { min-height: 44px; padding: 8px; }
+.compact-design .design-footer > div { display: grid; grid-template-columns: auto auto 1fr; gap: 8px; width: 100%; }
+.compact-design .design-button { min-height: 44px; padding: 8px; font-size: 11px; }
+.compact-design .design-button.primary { min-width: 0; white-space: normal; }
+.block-picker { position: fixed; inset: auto 0 0; margin: 0 auto; width: min(100%, 580px); max-width: 100%; max-height: 85dvh; padding: 0 0 env(safe-area-inset-bottom); border: 3px solid #203c42; color: #213e43; background: #f2f0e1; box-shadow: 0 -8px 40px #071a2355; overflow-y: auto; overscroll-behavior: contain; }
+.block-picker::backdrop { background: #0b242cb8; }
+.block-picker header { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 14px; background: #cad9c4; border-bottom: 2px solid #71896f; }
+.block-picker header strong { font: 700 16px "Courier New", monospace; }
+.block-picker header p { margin: 5px 0 0; font-size: 12px; }
+.block-picker header button { flex: none; width: 44px; height: 44px; font-size: 26px; color: #3c5e4c; background: #f2f0df; border: 1px solid #71896f; }
+.picker-cards { display: grid; gap: 10px; padding: 14px; }
+.block-picker .palette-card { width: 100%; min-height: 60px; padding: 12px; font-size: 14px; transform: none; }
+@media (max-height: 500px) and (min-width: 550px) {
+  .compact-design .design-footer { grid-template-columns: auto 1fr; }
+  .compact-design .design-footer > .design-button { font-size: 11px; }
+  .block-picker { max-height: calc(100dvh - 12px); }
+  .picker-cards { grid-template-columns: 1fr 1fr; }
 }

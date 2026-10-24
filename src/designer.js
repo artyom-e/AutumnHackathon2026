@@ -44,7 +44,7 @@ window.Hospital = window.Hospital || {};
 
   H.validateDiagram = function (slots, branches) {
     const missing = slots.findIndex(id => !id);
-    if (missing !== -1) return { ok: false, node: `slot-${missing}`, message: 'Здесь пока пусто. Перенеси сюда подходящий блок слева.' };
+    if (missing !== -1) return { ok: false, node: `slot-${missing}`, message: 'Здесь пока пусто. Выбери для этого места подходящий блок.' };
     const extra = [...slots.map((id, index) => [id, `slot-${index}`]), ...Object.entries(branches).map(([key, id]) => [id, `branch-${key}`])].find(([id]) => cards[id]?.extra);
     if (extra) return { ok: false, node: extra[1], message: extra[0] === 'auto-reschedule' ? 'В ТЗ нет автоматического переноса: при отказе нужно объяснить причину, а не выбирать время за пациента.' : 'Отмена одного приёма не должна освобождать весь день врача. Остальные записи нужно сохранить.' };
     const invalid = slots.findIndex(id => !Object.hasOwn(H.blocks, id));
@@ -65,6 +65,10 @@ window.Hospital = window.Hospital || {};
       this.validated = false;
       this.feedback = '';
       this.errorNode = '';
+      this.compactView = window.matchMedia('(max-width: 700px), (pointer: coarse) and (max-width: 1100px)');
+      this.compactView.addEventListener('change', () => {
+        if (this.overlay.classList.contains('design-overlay')) this.render();
+      });
       this.bind();
     }
 
@@ -139,6 +143,40 @@ window.Hospital = window.Hospital || {};
       </div>`;
     }
 
+    // Reuse the same nodes and branches: only their layout changes on a phone.
+    compactTree() {
+      const canvas = this.overlay.querySelector('.flow-canvas');
+      const node = id => canvas.querySelector(`[data-node="${id}"]`).outerHTML;
+      const end = id => node(id);
+      const branch = (label, id, endId) => `<div class="compact-branch"><span class="compact-label">${label}</span>${node(id)}${end(endId)}</div>`;
+      canvas.innerHTML = `<div class="compact-main">
+        ${node('start')}${node('slot-0')}${node('operation')}
+        ${branch('Да →', 'branch-cancel', 'end-cancel')}
+        <div class="compact-label continue-label">Нет ↓</div>
+        ${node('slot-1')}${node('decision')}
+        ${branch('Нет →', 'branch-schedule', 'end-schedule')}
+        <div class="compact-label continue-label">Да ↓</div>
+        ${node('slot-2')}
+        <div class="compact-fork"><div><span class="compact-label">Да ↓</span>${node('slot-3')}${node('slot-4')}${end('end-success')}</div><div><span class="compact-label">Нет ↓</span>${node('branch-available')}${end('end-available')}</div></div>
+      </div>`;
+      canvas.querySelectorAll('[style]').forEach(element => element.removeAttribute('style'));
+      canvas.querySelectorAll('[draggable]').forEach(element => element.draggable = false);
+    }
+
+    openPicker(key) {
+      const target = this.overlay.querySelector(`[data-slot="${key}"] .node-target`);
+      const difficulty = H.normalizeDifficulty(this.state().difficulty);
+      const dialog = document.createElement('dialog');
+      dialog.className = `block-picker difficulty-${difficulty}`;
+      dialog.setAttribute('aria-labelledby', 'picker-title');
+      dialog.innerHTML = `<header><div><strong id="picker-title">Выбери карточку</strong><p>${target.textContent.trim()}</p></div><button type="button" data-design="close-picker" aria-label="Закрыть выбор карточки">×</button></header><div class="picker-cards">${paletteOrder[difficulty].map(id => `<button class="palette-card kind-${cards[id].kind}" data-design="pick" data-card="${id}" data-destination="${key}"><span>${icon(cards[id].icon)}</span><span class="palette-label">${cards[id].label}</span>${this.getSlot(key) === id ? '<small>✓</small>' : ''}</button>`).join('')}</div>`;
+      this.overlay.querySelector('.design-workspace').appendChild(dialog);
+      // Let the native dialog trap focus and handle Escape, independently of the game modal.
+      dialog.addEventListener('keydown', event => event.stopPropagation());
+      dialog.addEventListener('close', () => { dialog.remove(); target.focus({ preventScroll: true }); });
+      dialog.showModal();
+    }
+
     render() {
       const state = this.state();
       if (state.stage !== 'puzzle') return;
@@ -196,13 +234,18 @@ window.Hospital = window.Hospital || {};
       `, true);
       this.overlay.classList.add('design-overlay');
       this.overlay.querySelector('.modal').classList.add('design-workspace', `difficulty-${difficulty}`);
+      if (this.compactView.matches) {
+        this.overlay.querySelector('.modal').classList.add('compact-design');
+        this.compactTree();
+        this.overlay.querySelector('.mobile-pan-hint').textContent = 'Нажми на место в схеме → выбери карточку. Дерево листается вверх и вниз.';
+      }
       document.body.appendChild(this.overlay);
       document.body.classList.add('designer-open');
       (this.scrollPositions || []).forEach(({ selector, top, left }) => {
         const element = this.overlay.querySelector(selector);
         if (element) { element.scrollTop = top; element.scrollLeft = left; }
       });
-      this.overlay.querySelector(this.selected ? `.palette-card[data-card="${this.selected}"]` : '.palette-card')?.focus({ preventScroll: true });
+      this.overlay.querySelector(this.compactView.matches ? '.node-target' : this.selected ? `.palette-card[data-card="${this.selected}"]` : '.palette-card')?.focus({ preventScroll: true });
     }
 
     validate() {
@@ -221,9 +264,16 @@ window.Hospital = window.Hospital || {};
         const button = event.target.closest('[data-design]');
         if (!button || button.disabled || this.state().stage !== 'puzzle') return;
         const action = button.dataset.design;
+        if (action === 'close-picker') { button.closest('dialog').close(); return; }
+        if (action === 'pick') {
+          button.closest('dialog').close();
+          this.place(button.dataset.destination, button.dataset.card);
+          return;
+        }
         if (action === 'select') { this.selected = this.selected === button.dataset.card ? null : button.dataset.card; this.render(); }
         if (action === 'place') {
-          if (this.selected) this.place(button.dataset.destination, this.selected);
+          if (this.compactView.matches) this.openPicker(button.dataset.destination);
+          else if (this.selected) this.place(button.dataset.destination, this.selected);
           else { this.overlay.querySelector('.design-footer-note').textContent = 'Сначала выбери блок в списке слева.'; this.overlay.querySelector('.palette-card')?.focus({ preventScroll: true }); }
         }
         if (action === 'remove') { this.remember(); this.setSlot(button.dataset.destination, null); this.changed(); }

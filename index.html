@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#131e2c">
   <meta name="description" content="Баг в больнице — короткая игра о работе системного аналитика. Собери требования, спроектируй алгоритм и помоги наладить запись пациентов.">
   <title>Баг в больнице</title>
@@ -37,7 +37,7 @@
         </nav>
       </header>
       <div class="interaction-prompt" id="interaction-prompt" hidden>
-        <kbd>E</kbd><span></span>
+        <kbd>E</kbd><svg class="interaction-hand" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M8 13V5a2 2 0 0 1 4 0v6-7a2 2 0 0 1 4 0v7-5a2 2 0 0 1 4 0v9c0 4-3 7-7 7h-1c-2 0-4-1-5-3l-4-6a2 2 0 0 1 3-2l2 2Z"/></svg><span></span>
       </div>
       <div class="scene-notice" id="scene-notice" aria-live="polite"></div>
       <div class="overlay" id="overlay" hidden></div>
@@ -52,8 +52,9 @@
           <button data-control="right" aria-label="Идти вправо">→</button>
         </div>
         <div>
-          <button data-control="jump" aria-label="Прыжок">↑</button>
-          <button data-control="interact" aria-label="Взаимодействовать">E</button>
+          <button data-control="down" aria-label="Спуститься по лестнице" title="Спуститься по лестнице">↓</button>
+          <button data-control="jump" aria-label="Прыжок / подняться по лестнице">↑</button>
+          <button data-control="interact" aria-label="Взаимодействовать" title="Взаимодействовать"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M8 13V5a2 2 0 0 1 4 0v6-7a2 2 0 0 1 4 0v7-5a2 2 0 0 1 4 0v9c0 4-3 7-7 7h-1c-2 0-4-1-5-3l-4-6a2 2 0 0 1 3-2l2 2Z"/></svg></button>
         </div>
       </div>
     </div>
