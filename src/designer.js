@@ -25,7 +25,7 @@ window.Hospital = window.Hospital || {};
     stop: '<rect x="5" y="5" width="14" height="14" rx="1"/>',
     cross: '<path d="M9 3h6v6h6v6h-6v6H9v-6H3V9h6z"/>',
   };
-  const icon = name => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths[name] || paths.file}</svg>`;
+  const icon = name => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" stroke-linejoin="miter" aria-hidden="true">${paths[name] || paths.file}</svg>`;
   const known = id => Object.hasOwn(cards, id);
   const emptySlots = () => Array(5).fill(null);
 
@@ -132,15 +132,15 @@ window.Hospital = window.Hospital || {};
       });
       const complete = this.validated;
       const filled = state.flowSlots.filter(Boolean).length + ['schedule', 'available', 'cancel'].filter(key => known(state.branches[key])).length;
-      const palette = Object.entries(cards).map(([id, card]) => `<button class="palette-card kind-${card.kind}${this.selected === id ? ' selected' : ''}" data-design="select" data-card="${id}" draggable="true" aria-pressed="${this.selected === id}"><span>${icon(card.icon)}</span>${card.label}</button>`).join('');
+      const palette = Object.entries(cards).map(([id, card], index) => `<button class="palette-card kind-${card.kind}${this.selected === id ? ' selected' : ''}" data-design="select" data-card="${id}" draggable="true" aria-pressed="${this.selected === id}"><span>${icon(card.icon)}</span><span class="palette-label">${card.label}</span><small class="palette-index" aria-hidden="true">${index + 1}</small></button>`).join('');
       const wire = (from, to, d, kind = 'yes') => `<path class="flow-wire wire-${kind}" data-from="${from}" data-to="${to}" d="${d}" marker-end="url(#arrow-${kind})"/>`;
       this.showModal('puzzle', `
-        <header class="design-header"><div class="design-brand">${icon('cross')}<div><strong>БОЛЬНИЦА №8</strong><span>СИСТЕМА ЗАПИСИ ПАЦИЕНТОВ</span></div></div><div class="design-tabs"><span class="active">${icon('file')} Проектирование</span></div><span class="design-user">Привет, Аналитик! <b>А</b></span></header>
+        <header class="design-header"><div class="design-brand"><span class="design-cross" aria-hidden="true">✚</span><strong>БОЛЬНИЦА №8</strong><span>/ КАБИНЕТ АНАЛИТИКА</span></div><span class="design-user">ПРОЕКТИРОВАНИЕ РЕШЕНИЯ</span><span class="window-pixels" aria-hidden="true"><i></i><i></i><i></i></span></header>
         <div class="design-body">
-          <aside class="design-palette"><h3>${icon('file')} Блоки действий</h3><div class="palette-items">${palette}</div><p class="palette-help">Перетащи блок на схему.<br>Или выбери его и нажми на нужное место.</p></aside>
-          <section class="design-center" aria-label="Поле схемы"><div class="design-document"><strong id="modal-title">Схема записи пациента</strong><span>ТЗ №001 · ${filled}/8 блоков</span></div><div class="design-instruction"><span>${this.selected ? `Выбран блок «${cards[this.selected].label}». Нажми на место в схеме.` : 'Собери ветки записи и отмены. При отмене освободи время для другого пациента.'}</span><small class="mobile-pan-hint">Схему можно листать влево и вправо ↔</small></div>
+          <aside class="design-palette"><h3>${icon('file')} Карточки алгоритма</h3><div class="palette-items">${palette}</div><p class="palette-help">Перетащи карточку на схему.<br>Или выбери её и нажми на нужное место.</p></aside>
+          <section class="design-center" aria-label="Поле схемы"><div class="design-document"><div><small>РАБОЧИЙ ЛИСТ · ТЗ №001</small><strong id="modal-title">Схема записи пациента</strong></div><span class="design-progress" aria-label="Размещено ${filled} из 8 блоков"><span>${filled}/8</span>${Array.from({ length: 8 }, (_, index) => `<i class="${index < filled ? 'filled' : ''}"></i>`).join('')}</span></div><div class="design-instruction"><span>${this.selected ? `Выбрана карточка «${cards[this.selected].label}». Нажми на место в схеме.` : 'Собери ветки записи и отмены. При отмене освободи время для другого пациента.'}</span><small class="mobile-pan-hint">Схему можно листать влево и вправо ↔</small></div>
             <div class="design-feedback ${this.errorNode ? 'is-error' : 'is-success'}" role="status" ${this.feedback ? '' : 'hidden'}>${this.feedback}</div><div class="flow-scroll"><div class="flow-canvas">
-              <svg class="flow-wires" viewBox="0 0 1000 900" preserveAspectRatio="none" aria-hidden="true"><defs>${['yes', 'no', 'neutral'].map(kind => `<marker id="arrow-${kind}" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M1 1 6 4 1 7" fill="none" stroke="${kind === 'no' ? '#b76c61' : '#5e8882'}" stroke-width="1.5"/></marker>`).join('')}</defs>
+              <svg class="flow-wires" viewBox="0 0 1000 900" preserveAspectRatio="none" aria-hidden="true"><defs>${['yes', 'no', 'neutral'].map(kind => `<marker id="arrow-${kind}" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M1 1 6 4 1 7" fill="none" stroke="${kind === 'no' ? '#a66c52' : '#52745d'}" stroke-width="1.5"/></marker>`).join('')}</defs>
               ${wire('start', 'slot-0', 'M500 63 V90', 'neutral')}${wire('slot-0', 'operation', 'M500 153 V180', 'neutral')}
               ${wire('operation', 'branch-cancel', 'M645 225 H750')}${wire('branch-cancel', 'end-cancel', 'M865 261 V306')}
               ${wire('operation', 'slot-1', 'M500 270 V306', 'neutral')}${wire('slot-1', 'decision', 'M500 369 V396', 'neutral')}
