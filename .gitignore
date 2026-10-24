@@ -1,4 +1,15 @@
-.artifacts/
-node_modules/
-dist/
+# Local archives and browser check artifacts
+/.local/
+/.artifacts/
+
+# Generated files
+/node_modules/
+/dist/
 *.log
+
+# Local editor and OS files
+/.idea/
+/.vscode/
+.DS_Store
+Thumbs.db
+Desktop.ini

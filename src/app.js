@@ -3,7 +3,7 @@
   const H = Hospital;
   const storageKey = 'hospital-bug-mvp-v1';
   const stages = ['intro', 'briefing', 'route1', 'dialogue', 'route2', 'puzzle', 'route3', 'handoff', 'testing', 'complete'];
-  const freshState = (difficulty = 'easy') => ({ stage: 'intro', difficulty: H.normalizeDifficulty(difficulty), question: 0, order: [...H.initialOrder], branches: { schedule: '', available: '', cancel: '' }, flowSlots: Array(5).fill(null), testDone: [], clientMet: false, storyProgress: { briefing: 0, client: 0, handoff: 0 }, startedAt: 0, completedAt: 0, playerName: '', demo: false });
+  const freshState = (difficulty = 'easy') => ({ stage: 'intro', difficulty: H.normalizeDifficulty(difficulty), question: 0, order: [...H.initialOrder], branches: { schedule: '', available: '', cancel: '' }, flowSlots: Array(5).fill(null), testDone: [], clientMet: false, storyProgress: { briefing: 0, client: 0, handoff: 0 }, startedAt: 0, completedAt: 0 });
   let state = freshState();
   let storageAvailable = true;
   try {
@@ -18,13 +18,12 @@
       state.testDone = Array.isArray(saved.testDone) ? H.scenarios.filter(item => saved.testDone.includes(item.id)).map(item => item.id) : [];
       state.storyProgress = Object.fromEntries(Object.entries(H.dialogues).map(([key, lines]) => [key, Math.max(0, Math.min(lines.length - 1, Number.isInteger(saved.storyProgress?.[key]) ? saved.storyProgress[key] : 0))]));
       state.clientMet = saved.clientMet === true || state.question > 0;
-      state.playerName = typeof saved.playerName === 'string' ? saved.playerName.slice(0, 24) : '';
       for (const key of ['startedAt', 'completedAt']) state[key] = Number.isFinite(saved[key]) && saved[key] > 0 && saved[key] <= Date.now() ? saved[key] : 0;
-      state.demo = saved.demo === true;
     }
   } catch { storageAvailable = false; }
   let selectedDifficulty = state.difficulty;
 
+  const sound = new H.AudioManager();
   const overlay = document.getElementById('overlay');
   let currentScreen = '';
   let returnScreen = '';
@@ -62,8 +61,7 @@
   function save() {
     H.appState = state;
     try { localStorage.setItem(storageKey, JSON.stringify(state)); } catch { storageAvailable = false; }
-    document.getElementById('save-status').textContent = storageAvailable ? 'Прогресс сохраняется в этом браузере' : 'Прогресс доступен до закрытия страницы';
-    updateMission();
+    document.getElementById('requirement-count').textContent = `${state.question}/4`;
   }
 
   function toast(message) {
@@ -75,6 +73,8 @@
   }
 
   function showModal(screen, html, wide = false) {
+    const windowFamily = value => value === 'client-intro' ? 'dialogue' : value;
+    const opened = overlay.hidden || windowFamily(currentScreen) !== windowFamily(screen);
     stopTyping();
     activeConversation = null;
     document.body.classList.remove('designer-open', 'screen-open');
@@ -86,9 +86,11 @@
     game.clearInput();
     game.setPrompt('');
     overlay.hidden = false;
-    const chrome = screen === 'puzzle' ? '' : '<header class="window-chrome"><span class="window-cross" aria-hidden="true">✚</span><span>БОЛЬНИЦА №8 <b>/ РАБОЧАЯ СМЕНА АНАЛИТИКА</b></span><span class="window-pixels" aria-hidden="true"><i></i><i></i><i></i></span></header>';
+    const chrome = screen === 'puzzle' ? '' : `<header class="window-chrome"><span class="window-cross" aria-hidden="true">✚</span><span>БОЛЬНИЦА №8 <b>/ РАБОЧАЯ СМЕНА АНАЛИТИКА</b></span>${H.AudioManager.control('window-audio')}<span class="window-pixels" aria-hidden="true"><i></i><i></i><i></i></span></header>`;
     overlay.innerHTML = `<section class="modal${wide ? ' wide' : ''}${screen === 'puzzle' ? '' : ' game-window'}" role="dialog" aria-modal="true" aria-labelledby="modal-title">${chrome}${screen === 'puzzle' ? html : `<div class="window-content">${html}</div>`}</section>`;
-    overlay.querySelector('button:not([disabled]), input, select, summary')?.focus({ preventScroll: true });
+    sound.refreshControls();
+    if (opened) sound.openWindow();
+    overlay.querySelector('button:not([disabled]):not([data-audio-toggle]), input, select, summary')?.focus({ preventScroll: true });
   }
 
   function resume() {
@@ -104,24 +106,10 @@
     document.getElementById('game').focus({ preventScroll: true });
   }
 
-  function updateMission() {
-    const phase = ({ intro: 0, briefing: 0, route1: 0, dialogue: 1, route2: 2, puzzle: 2, route3: 3, handoff: 3, testing: 3, complete: 4 })[state.stage];
-    document.getElementById('quest-list').innerHTML = H.quests.map((quest, index) => `<li class="quest-item ${index < phase ? 'done' : index === phase ? 'active' : ''}"><span class="quest-number">${index < phase ? '✓' : `0${index + 1}`}</span><div><strong>${quest.title}</strong><small>${quest.text}</small></div></li>`).join('');
-    const progress = ({ intro: 0, briefing: 0, route1: 5, dialogue: 15 + state.question * 8, route2: 50, puzzle: 55, route3: 75, handoff: 80, testing: 80 + state.testDone.length * 3, complete: 100 })[state.stage];
-    document.getElementById('progress-label').textContent = `${progress}%`;
-    document.getElementById('progress-bar').style.width = `${progress}%`;
-    document.getElementById('requirement-count').textContent = `${state.question}/4`;
-    const tips = ['Хороший аналитик сначала понимает проблему, а уже потом предлагает решение.', 'Заказчик говорит о проблемах. Твоя задача — превратить их в понятные правила.', 'У каждого «а что, если…» должна быть своя ветка в алгоритме.', 'Проверяй и успешную запись, и отказ, и отмену. Все сценарии важны.', 'Ты соединил потребности больницы с понятным решением для разработчика.'];
-    document.getElementById('analyst-tip').textContent = tips[phase];
-    document.getElementById('hospital-status').textContent = state.stage === 'complete' ? 'Система записи: работает' : 'Система записи: сбой';
-    document.getElementById('hospital-status').style.color = state.stage === 'complete' ? '#96c9ac' : '';
-  }
-
   function setRoute(level) {
     game.setLevel(level);
-    document.getElementById('scene-title').textContent = ['01 / БОЛЬНИЧНЫЙ КОРИДОР', '02 / ПУТЬ В КАБИНЕТ', '03 / ОБРАТНО В IT-ОТДЕЛ'][level];
-    document.getElementById('scene-objective').textContent = ['Доберись до регистратуры →', 'Две кнопки откроют проход →', 'Программист ждёт решение →'][level];
-    document.getElementById('floor-label').textContent = ['1 ЭТАЖ · РЕГИСТРАТУРА', '2 ЭТАЖ · КАБИНЕТ АНАЛИТИКА', '1 ЭТАЖ · IT-ОТДЕЛ'][level];
+    document.getElementById('scene-title').textContent = ['01 / К ЗАКАЗЧИКУ', '02 / КАБИНЕТ АНАЛИТИКА', '03 / ОБРАТНО В IT-ОТДЕЛ'][level];
+    document.getElementById('scene-objective').textContent = ['Поговори с заказчиком →', 'Две кнопки откроют проход →', 'Программист ждёт решение →'][level];
   }
 
   function transition(stage) { state.stage = stage; save(); renderStage(); }
@@ -139,12 +127,11 @@
 
   function renderIntro() {
     const saved = state.stage !== 'intro';
-    showModal('intro', `<div class="shift-hero"><div><div class="modal-eyebrow">МИССИЯ 001 · СБОЙ РАСПИСАНИЯ</div><h2 id="modal-title">Баг в больнице</h2><p class="screen-lead">Игра о профессии системного аналитика</p></div>${portrait('hero')}<svg class="shift-ecg" viewBox="0 0 600 45" aria-hidden="true"><path d="M0 24H180l12-17 15 32 15-24 12 9h366"/></svg></div>
-      <p class="screen-intro">К одному врачу на одно время записались сразу трое. В коридорах очереди, главврач требует всё исправить. Ты — аналитик: выясни, что нужно заказчику, и объясни это программисту.</p>
+    showModal('intro', `<div class="shift-hero"><div><h2 id="modal-title">Баг в больнице</h2><p class="screen-lead">Игра о профессии системного аналитика</p></div>${portrait('hero')}<svg class="shift-ecg" viewBox="0 0 600 45" aria-hidden="true"><path d="M0 24H180l12-17 15 32 15-24 12 9h366"/></svg></div>
       <div class="shift-features"><div><span>01</span><strong>Поговори</strong><p>Собери требования у заказчика</p></div><div><span>02</span><strong>Спроектируй</strong><p>Построй схему записи и отмены</p></div><div><span>03</span><strong>Проверь</strong><p>Пройди три маршрута и пять сценариев</p></div></div>
-      <fieldset class="difficulty-picker"><legend>Сложность${saved ? ' новой смены' : ''}</legend><p class="difficulty-help">Меняются только вопросы заказчика и подсказки в схеме. Маршруты и управление одинаковые.</p><div class="difficulty-options">${Object.entries(H.difficulties).map(([id, level], index) => `<button type="button" class="difficulty-option" data-action="difficulty" data-difficulty="${id}" aria-pressed="${selectedDifficulty === id}"><span class="difficulty-option-title"><span class="difficulty-bars" aria-hidden="true">${Array.from({ length: 3 }, (_, bar) => `<i class="${bar <= index ? 'lit' : ''}"></i>`).join('')}</span><strong>${level.name}</strong><span class="difficulty-check" aria-hidden="true">✓</span></span><span class="difficulty-detail"><b>Заказчик</b>${level.client}</span><span class="difficulty-detail"><b>Схема</b>${level.designer}</span></button>`).join('')}</div></fieldset>
+      <fieldset class="difficulty-picker"><legend>Сложность${saved ? ' новой смены' : ''}</legend><div class="difficulty-options">${Object.entries(H.difficulties).map(([id, level], index) => `<button type="button" class="difficulty-option" data-action="difficulty" data-difficulty="${id}" aria-pressed="${selectedDifficulty === id}"><span class="difficulty-option-title"><span class="difficulty-bars" aria-hidden="true">${Array.from({ length: 3 }, (_, bar) => `<i class="${bar <= index ? 'lit' : ''}"></i>`).join('')}</span><strong>${level.name}</strong><span class="difficulty-check" aria-hidden="true">✓</span></span><span class="difficulty-detail"><b>Заказчик</b>${level.client}</span><span class="difficulty-detail"><b>Схема</b>${level.designer}</span></button>`).join('')}</div></fieldset>
       <div class="intro-controls"><span><kbd>A</kbd><kbd>D</kbd> идти</span><span><kbd>Пробел</kbd> прыгать</span><span><kbd>E</kbd> взаимодействовать</span></div>
-      ${saved ? `<p class="save-note">Сохранённая смена: «${H.difficulties[state.difficulty].name}». «Продолжить» сохранит её сложность и прогресс; выбор выше применяется к новой смене.</p>` : ''}<div class="modal-actions">${button('Управление', 'help', 'secondary')}${saved ? button('Новая смена', 'start', 'secondary') + button('Продолжить →', 'continue', 'dark') : button('Начать смену →', 'start', 'dark')}</div><p class="small-help">Без ограничения попыток · прогресс сохраняется в этом браузере</p>`, true);
+      <div class="modal-actions">${button('Управление', 'help', 'secondary')}${saved ? button('Новая смена', 'start', 'secondary') + button('Продолжить →', 'continue', 'dark') : button('Начать смену →', 'start', 'dark')}</div><p class="small-help">Без ограничения попыток${storageAvailable ? ' · прогресс сохраняется в этом браузере' : ''}</p>`, true);
   }
 
   function stopTyping() { clearInterval(typingTimer); typingTimer = null; }
@@ -251,10 +238,8 @@
   }
 
   function renderComplete() {
-    const seconds = state.startedAt && state.completedAt >= state.startedAt ? Math.floor((state.completedAt - state.startedAt) / 1000) : null;
-    showModal('complete', `<div class="modal-eyebrow">МИССИЯ 001 · ВЫПОЛНЕНО${state.demo ? ' · БЫСТРЫЙ ПОКАЗ' : ''}</div><h2 id="modal-title">Миссия выполнена!</h2><div class="story-dialogue victory-thanks"><div class="story-portrait">${portrait('programmer')}<strong>Макс</strong><small>Программист</small></div><div class="speech-bubble"><p>«Спасибо! Без правильно собранных требований я мог бы исправить не ту проблему».</p></div></div>
+    showModal('complete', `<h2 id="modal-title">Миссия выполнена!</h2><div class="story-dialogue victory-thanks"><div class="story-portrait">${portrait('programmer')}<strong>Макс</strong><small>Программист</small></div><div class="speech-bubble"><p>«Спасибо! Без правильно собранных требований я мог бы исправить не ту проблему».</p></div></div>
       <p>Больница снова работает, а пациенты записываются без конфликтов. Ты попробовал себя в роли системного аналитика.</p>
-      <section class="analyst-certificate"><div class="certificate-seal" aria-hidden="true">✚</div><h3>Сертификат первой смены</h3><label for="certificate-name">Подтверждает, что</label><input id="certificate-name" class="certificate-name" maxlength="24" autocomplete="given-name" placeholder="Введи своё имя" value="${escapeHtml(state.playerName)}"><p><strong id="certificate-holder">${escapeHtml(state.playerName.trim() || 'Игрок')}</strong> собрал требования, построил алгоритм и помог команде исправить систему записи пациентов.</p><div class="certificate-stats">4 требования · схема записи и отмены · 5/5 проверок${seconds === null ? '' : ` · ${Math.floor(seconds / 60)} мин ${seconds % 60} с`}</div></section>
       <h3 class="skills-title">Что делает аналитик — и что сделал ты</h3><div class="skills-table">${H.analystSkills.map(([skill, result]) => `<div><strong>${skill}</strong><span>${result}</span></div>`).join('')}</div><p class="analyst-note">Сегодня ты превращал пожелания заказчика в понятные требования и схему — и проверял результат вместе с разработчиком.</p><div class="modal-actions">${button('Посмотреть ТЗ', 'notebook', 'secondary')}${button('Пройти ещё раз ↻', 'replay', 'dark')}</div>`, true);
   }
 
@@ -265,7 +250,7 @@
 
   function openHelp() {
     returnScreen = currentScreen;
-    showModal('help', `<div class="modal-eyebrow">ПАМЯТКА НОВОГО СОТРУДНИКА</div><h2 id="modal-title">Твой первый день аналитиком</h2><div class="help-controls"><div><kbd>A / D</kbd><span>Идти · или стрелки ← / →</span></div><div><kbd>Пробел</kbd><span>Прыгать · или W / ↑</span></div><div><kbd>W / S</kbd><span>Лезть по лестнице вверх / вниз · или ↑ / ↓</span></div><div><kbd>E</kbd><span>Нажать кнопку, поговорить, открыть компьютер</span></div></div><p>Перепрыгивай лужи и провалы. Лифт поднимает и спускает обратно. Во втором коридоре проход откроют две кнопки. За ошибки нет штрафа — пробуй снова.</p><div class="shift-features"><div><strong>Заказчик</strong><p>Выбирай правило, по которому должна работать программа.</p></div><div><strong>Схема</strong><p>Перетаскивай блоки. Или выбери блок, затем нажми на место в схеме.</p></div><div><strong>Проверка</strong><p>Вернись к Максу и проверь пять ситуаций с пациентами.</p></div></div><p class="small-help">На телефоне доступны экранные кнопки. В разговоре Enter продолжает реплику. «Быстрый показ» под игрой открывает отдельную механику.</p><div class="modal-actions">${button('Понятно, играем →', 'back', 'dark')}</div>`, true);
+    showModal('help', `<div class="modal-eyebrow">ПАМЯТКА НОВОГО СОТРУДНИКА</div><h2 id="modal-title">Твой первый день аналитиком</h2><div class="help-controls"><div><kbd>A / D</kbd><span>Идти · или стрелки ← / →</span></div><div><kbd>Пробел</kbd><span>Прыгать · или W / ↑</span></div><div><kbd>W / S</kbd><span>Лезть по лестнице вверх / вниз · или ↑ / ↓</span></div><div><kbd>E</kbd><span>Нажать кнопку, поговорить, открыть компьютер</span></div></div><p>Перепрыгивай лужи и провалы. Лифт поднимает и спускает обратно. Во втором коридоре проход откроют две кнопки. За ошибки нет штрафа — пробуй снова.</p><div class="shift-features"><div><strong>Заказчик</strong><p>Выбирай правило, по которому должна работать программа.</p></div><div><strong>Схема</strong><p>Перетаскивай блоки. Или выбери блок, затем нажми на место в схеме.</p></div><div><strong>Проверка</strong><p>Вернись к Максу и проверь пять ситуаций с пациентами.</p></div></div><p class="small-help">На телефоне доступны экранные кнопки. В разговоре Enter продолжает реплику.</p><div class="modal-actions">${button('Понятно, играем →', 'back', 'dark')}</div>`, true);
   }
 
   function openRestart() {
@@ -324,31 +309,13 @@
     if (action === 'back') renderScreen(returnScreen);
     if (action === 'replay') { designer.resetSession(); state = freshState(state.difficulty); selectedDifficulty = state.difficulty; system = null; testResults = {}; save(); renderStage(); }
   });
-  overlay.addEventListener('input', event => {
-    if (event.target.id !== 'certificate-name') return;
-    state.playerName = event.target.value.slice(0, 24);
-    document.getElementById('certificate-holder').textContent = state.playerName.trim() || 'Игрок';
-    save();
-  });
 
   document.getElementById('notebook-button').addEventListener('click', () => { if (!['notebook', 'help', 'restart'].includes(currentScreen)) openNotebook(); });
   document.getElementById('help-button').addEventListener('click', () => { if (!['notebook', 'help', 'restart'].includes(currentScreen)) openHelp(); });
   document.getElementById('restart-button').addEventListener('click', () => { if (!['notebook', 'help', 'restart'].includes(currentScreen)) openRestart(); });
-  document.getElementById('demo-select').addEventListener('change', event => {
-    const value = event.target.value;
-    if (!value) return;
-    designer.resetSession();
-    state = freshState(currentScreen === 'intro' ? selectedDifficulty : state.difficulty); selectedDifficulty = state.difficulty; state.demo = true; state.startedAt = Date.now(); system = null; testResults = {};
-    if (value === 'platform') state.stage = 'route1';
-    if (value === 'dialogue') state.stage = 'dialogue';
-    if (value === 'puzzle') { state.stage = 'puzzle'; state.question = 4; }
-    if (value === 'testing') { state.stage = 'testing'; state.question = 4; state.order = [...H.correctOrder]; state.branches = { schedule: 'off-hours', available: 'occupied', cancel: 'release' }; }
-    save(); renderStage(); event.target.value = '';
-    toast('Демонстрация механики. Прогресс начат с выбранного этапа.');
-  });
   document.addEventListener('keydown', event => {
     if (overlay.hidden) return;
-    if (event.code === 'Enter' && activeConversation && !event.repeat && !/INPUT|TEXTAREA|SELECT/.test(event.target.tagName)) { event.preventDefault(); advanceConversation(); return; }
+    if (event.code === 'Enter' && activeConversation && !event.repeat && !event.target.closest?.('[data-audio-toggle]') && !/INPUT|TEXTAREA|SELECT/.test(event.target.tagName)) { event.preventDefault(); advanceConversation(); return; }
     if (event.code === 'Escape' && ['notebook', 'help', 'restart'].includes(currentScreen)) renderScreen(returnScreen);
     if (event.code !== 'Tab') return;
     const elements = [...overlay.querySelectorAll('button:not([disabled]), input, select, summary')];

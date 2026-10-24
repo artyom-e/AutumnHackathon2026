@@ -1439,6 +1439,7 @@ Hospital.Game = class {
     if (this.invulnerable > 0 && Math.floor(this.time * 12) % 2 === 0) return;
     const p = this.player;
     const motion = p.climbing ? p.climbPhase : p.grounded && Math.abs(p.vx) > 0 ? this.time * 13 : 0;
+    const airborne = !p.climbing && !p.grounded ? p.vy < -100 ? 'up' : p.vy > 100 ? 'down' : 'apex' : '';
     // Cache the current pixel pose, then draw a one-pixel warm outline behind it.
     if (!this.heroVisual) {
       const sprite = document.createElement('canvas'); sprite.width = 64; sprite.height = 100;
@@ -1446,12 +1447,12 @@ Hospital.Game = class {
       this.heroVisual = { sprite, silhouette, pose: '' };
     }
     const visual = this.heroVisual;
-    const pose = `${p.facing}/${p.climbing}/${Math.round(Math.sin(motion) * 2)}`;
+    const pose = `${p.facing}/${p.climbing}/${airborne}/${Math.round(Math.sin(motion) * 2)}`;
     if (visual.pose !== pose) {
       const spriteContext = visual.sprite.getContext('2d');
       spriteContext.clearRect(0, 0, 64, 100);
       const brush = { rect: (x, y, w, h, color) => { spriteContext.fillStyle = color; spriteContext.fillRect(Math.round(x), Math.round(y), Math.round(w), Math.round(h)); } };
-      this.person.call(brush, 18, 32, '#df9867', p.facing, motion, true, false, '', p.climbing);
+      this.person.call(brush, 18, 32, '#df9867', p.facing, motion, true, false, '', p.climbing, 1.5, airborne);
       const mask = visual.silhouette.getContext('2d');
       mask.clearRect(0, 0, 64, 100);
       mask.globalCompositeOperation = 'source-over'; mask.fillStyle = '#f4d29c'; mask.fillRect(0, 0, 64, 100);
@@ -1471,7 +1472,7 @@ Hospital.Game = class {
     c.restore();
   }
 
-  person(x, y, shirt, facing = 1, walk = 0, hero = false, seated = false, role = '', climbing = false, scale = 1.5) {
+  person(x, y, shirt, facing = 1, walk = 0, hero = false, seated = false, role = '', climbing = false, scale = 1.5, airborne = '') {
     // One pixel grid and outline palette keep every character in the same style.
     const outline = '#111c25';
     const nurse = role === 'nurse';
@@ -1515,7 +1516,7 @@ Hospital.Game = class {
       const right = Math.round((dx + w) * .75);
       pixel(4 + (facing < 0 && !climbing ? 21 - right : left), (seated ? 24 : 0) + dy, Math.max(1, right - left), h, color);
     };
-    if (!climbing) pixel(1, seated ? 82 : 53, 28, 3, '#102d3026');
+    if (!climbing && !airborne) pixel(1, seated ? 82 : 53, 28, 3, '#102d3026');
 
     if (climbing) {
       const reach = Math.round(Math.sin(walk) * 2);
@@ -1585,6 +1586,22 @@ Hospital.Game = class {
       r(22, 45, 4, 11, pants);
       r(21, 56, 12, 4, outline);
       r(23, 57, 8, 2, '#765c49');
+    } else if (airborne) {
+      // Classic platformer silhouette: one knee back, the other leg extended.
+      const bend = airborne === 'up' ? 2 : airborne === 'apex' ? 4 : 0;
+      r(5, 34, 22, 6, outline);
+      r(7, 36, 18, 4, pants);
+      r(4, 38, 11, 9 - bend, outline);
+      r(6, 39, 7, 6 - bend, pants);
+      r(-1, 42 - bend, 14, 7, outline);
+      r(1, 43 - bend, 10, 4, pants);
+      r(-4, 46 - bend, 15, 5, outline);
+      r(-2, 47 - bend, 11, 2, '#765440');
+      r(18, 38, 10, 14, outline);
+      r(20, 39, 6, 11, pants);
+      r(23, 44, 2, 6, pantsShade);
+      r(19, 50, 14, 4, outline);
+      r(21, 51, 10, 2, '#765440');
     } else {
       const leftLift = Math.max(0, stride);
       const rightLift = Math.max(0, -stride);
@@ -1602,18 +1619,34 @@ Hospital.Game = class {
       r(20 - stride, 51 - rightLift, 8, 2, '#765440');
     }
 
-    // Sleeves and hands sit behind the jacket, with a small opposite arm swing.
-    r(2, 23 + armSwing, 6, 15, outline);
-    r(0, 28 + armSwing, 7, 13, outline);
-    r(2, 26 + armSwing, 4, 12, coatShade);
-    r(1, 36 + armSwing, 6, 8, outline);
-    r(2, 38 + armSwing, 4, 5, skin);
-    r(2, 38 + armSwing, 3, 2, skinLight);
-    r(24, 23 - armSwing, 6, 17, outline);
-    r(25, 26 - armSwing, 4, 12, coat);
-    r(25, 37 - armSwing, 6, 7, outline);
-    r(26, 38 - armSwing, 3, 5, skin);
-    r(27, 40 - armSwing, 2, 2, skinShade);
+    // Keep both hands below the shoulders, with a small bend for balance.
+    if (airborne) {
+      const settle = airborne === 'down' ? 2 : 0;
+      r(-2, 25, 9, 13, outline);
+      r(0, 27, 5, 9, coatShade);
+      r(-3, 35, 8, 7, outline);
+      r(-2, 36, 5, 5, skin);
+      r(-2, 36, 4, 2, skinLight);
+      r(24, 23, 7, 12 + settle, outline);
+      r(25, 25, 4, 8 + settle, coat);
+      r(25, 31 + settle, 10, 7, outline);
+      r(26, 32 + settle, 7, 4, coatLight);
+      r(31, 29 + settle, 7, 7, outline);
+      r(32, 30 + settle, 5, 5, skin);
+      r(32, 30 + settle, 4, 2, skinLight);
+    } else {
+      r(2, 23 + armSwing, 6, 15, outline);
+      r(0, 28 + armSwing, 7, 13, outline);
+      r(2, 26 + armSwing, 4, 12, coatShade);
+      r(1, 36 + armSwing, 6, 8, outline);
+      r(2, 38 + armSwing, 4, 5, skin);
+      r(2, 38 + armSwing, 3, 2, skinLight);
+      r(24, 23 - armSwing, 6, 17, outline);
+      r(25, 26 - armSwing, 4, 12, coat);
+      r(25, 37 - armSwing, 6, 7, outline);
+      r(26, 38 - armSwing, 3, 5, skin);
+      r(27, 40 - armSwing, 2, 2, skinShade);
+    }
     r(7, 18, 16, 3, outline);
     r(4, 21, 23, 5, outline);
     r(5, 25, 22, 12, outline);

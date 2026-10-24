@@ -156,7 +156,7 @@ window.Hospital = window.Hospital || {};
       }).join('');
       const wire = (from, to, d, kind = 'yes') => `<path class="flow-wire wire-${kind}" data-from="${from}" data-to="${to}" d="${d}" marker-end="url(#arrow-${kind})"/>`;
       this.showModal('puzzle', `
-        <header class="design-header"><div class="design-brand"><span class="design-cross" aria-hidden="true">✚</span><strong>БОЛЬНИЦА №8</strong><span>/ КАБИНЕТ АНАЛИТИКА</span></div><span class="design-user">ПРОЕКТИРОВАНИЕ РЕШЕНИЯ</span><span class="window-pixels" aria-hidden="true"><i></i><i></i><i></i></span></header>
+        <header class="design-header"><div class="design-brand"><span class="design-cross" aria-hidden="true">✚</span><strong>БОЛЬНИЦА №8</strong><span>/ КАБИНЕТ АНАЛИТИКА</span></div><span class="design-user">ПРОЕКТИРОВАНИЕ РЕШЕНИЯ</span>${H.AudioManager.control('design-audio')}<span class="window-pixels" aria-hidden="true"><i></i><i></i><i></i></span></header>
         <div class="design-body">
           <aside class="design-palette"><h3>${icon('file')} Карточки алгоритма</h3><div class="palette-items">${palette}</div><p class="palette-help">Перетащи карточку на схему.<br>Или выбери её и нажми на нужное место.</p></aside>
           <section class="design-center" aria-label="Поле схемы"><div class="design-document"><div><small>РАБОЧИЙ ЛИСТ · ТЗ №001 · ${H.difficulties[difficulty].name.toUpperCase()}</small><strong id="modal-title">Схема записи пациента</strong></div><span class="design-progress" aria-label="Размещено ${filled} из 8 блоков"><span>${filled}/8</span>${Array.from({ length: 8 }, (_, index) => `<i class="${index < filled ? 'filled' : ''}"></i>`).join('')}</span></div><div class="design-instruction"><span>${this.selected ? `Выбрана карточка «${cards[this.selected].label}». Нажми на место в схеме.` : instructions[difficulty]}</span><small class="mobile-pan-hint">Схему можно листать влево и вправо ↔</small></div>
@@ -202,7 +202,7 @@ window.Hospital = window.Hospital || {};
         const element = this.overlay.querySelector(selector);
         if (element) { element.scrollTop = top; element.scrollLeft = left; }
       });
-      this.overlay.querySelector(this.selected ? `.palette-card[data-card="${this.selected}"]` : 'button:not([disabled])')?.focus({ preventScroll: true });
+      this.overlay.querySelector(this.selected ? `.palette-card[data-card="${this.selected}"]` : '.palette-card')?.focus({ preventScroll: true });
     }
 
     validate() {
