@@ -455,7 +455,7 @@ Hospital.Game = class {
     this.bench(30, 414);
     this.person(48, 381, '#a18e91', 1, 0, false, true);
     this.person(143, 381, '#7e9f9b', -1, 0, false, true);
-    this.person(335, 374, '#e7e9d2', -1, 0);
+    this.person(335, 374, '#e7e9d2', -1, 0, false, false, 'nurse');
     this.receptionDesk(275, 407, 155);
     this.receptionPlant(701, 416);
     this.receptionWaterCooler(220, 384);
@@ -513,7 +513,7 @@ Hospital.Game = class {
     this.clock(2350, 272);
     const clientFloor = this.receptionMap.clientFloor;
     this.receptionDoor(this.goal - 28, clientFloor, true);
-    this.person(this.goal - 82, clientFloor - 54, '#e7e9d2', -1, 0);
+    this.person(this.goal - 82, clientFloor - 54, '#e7e9d2', -1, 0, false, false, 'client');
     const bob = Math.sin(this.time * 2.7) * 3;
     const bubbleY = clientFloor - 90 + bob;
     this.rect(this.goal - 80, bubbleY, 29, 20, '#e4a16d');
@@ -638,7 +638,7 @@ Hospital.Game = class {
     this.receptionNotices(160, 294);
     this.receptionPlant(565, 416);
     this.receptionWaterCooler(505, 384);
-    this.person(278, 367, '#c8d6b7', -1, 0);
+    this.person(278, 367, '#c8d6b7', -1, 0, false, false, 'nurse');
     this.receptionDesk(230, 401, 170);
     this.receptionBed(65, 386);
     this.receptionBin(427, 433);
@@ -1324,26 +1324,161 @@ Hospital.Game = class {
     this.rect(x - 3, 464, 102, 3, '#577866');
   }
 
-  person(x, y, shirt, facing = 1, walk = 0, hero = false, seated = false) {
-    const r = (dx, dy, w, h, color) => this.rect(x + dx, y + dy, w, h, color);
-    const step = walk ? Math.sin(walk) * 4 : 0;
-    r(-4, 53, 36, 4, '#426b652a');
-    r(7, 1, 18, 4, hero ? '#3e4e4c' : '#706d60');
-    r(4, 5, 22, 12, hero ? '#3e4e4c' : '#706d60');
-    r(7, 9, 18, 15, '#d9b28d');
-    r(facing > 0 ? 18 : 8, 12, 3, 3, '#3c514d');
-    r(10, 23, 12, 4, '#c49e7c');
-    r(4, 26, 23, 18, shirt);
-    r(0, 29, 5, 15, shirt);
-    r(27, 29, 5, 15, shirt);
-    r(0, 42, 5, 6, '#d8b08c');
-    r(27, 42, 5, 6, '#d8b08c');
-    r(5, 44, 9, seated ? 7 : 9 + step, '#4e6261');
-    r(17, 44, 9, seated ? 7 : 9 - step, '#4e6261');
-    r(3, 51 + (seated ? 0 : step), 11, 4, '#344c4e');
-    r(17, 51 - (seated ? 0 : step), 12, 4, '#344c4e');
-    if (hero) { r(17, 28, 6, 10, '#ecd6b0'); r(19, 30, 2, 4, '#718b79'); r(4, 25, 3, 17, '#b47c56'); }
-    else if (shirt === '#e7e9d2') { r(14, 27, 2, 16, '#a6bca8'); r(19, 29, 5, 5, '#82a795'); }
+  person(x, y, shirt, facing = 1, walk = 0, hero = false, seated = false, role = '') {
+    // One pixel grid and outline palette keep every character in the same style.
+    const outline = '#111c25';
+    const nurse = role === 'nurse';
+    const client = role === 'client';
+    const medical = nurse || client || shirt === '#e7e9d2';
+    const programmer = !hero && shirt === '#709198';
+    const skin = seated && shirt === '#7e9f9b' ? '#dba17c' : '#ffc39b';
+    const skinLight = skin === '#dba17c' ? '#ebba91' : '#ffd3ac';
+    const skinShade = skin === '#dba17c' ? '#bb7d60' : '#e99a73';
+    const hair = programmer ? '#493b36' : seated && shirt === '#7e9f9b' ? '#6e6b63' : '#674236';
+    const hairLight = programmer ? '#655047' : seated && shirt === '#7e9f9b' ? '#969084' : '#855847';
+    const coat = hero ? '#c35428' : medical ? nurse ? '#dce2c7' : '#eee7cd' : shirt;
+    const coatShade = hero ? '#933e24' : medical ? '#9aaf9d' : programmer ? '#496a71' : '#586e70';
+    const coatLight = hero ? '#df7137' : medical ? '#f6efd8' : programmer ? '#91afb0' : '#b6b9aa';
+    const pants = hero ? '#584437' : medical ? '#5c7168' : '#465156';
+    const pantsShade = hero ? '#3f302b' : '#303d42';
+    const stride = walk && !seated ? Math.round(Math.sin(walk) * 2) : 0;
+    const armSwing = stride ? Math.sign(stride) : 0;
+    const originY = y + (seated ? 24 : 0);
+    const r = (dx, dy, w, h, color) => {
+      const left = Math.round(dx * .75);
+      const right = Math.round((dx + w) * .75);
+      this.rect(x + 4 + (facing < 0 ? 21 - right : left), originY + dy, Math.max(1, right - left), h, color);
+    };
+    this.rect(x + 1, seated ? originY + 58 : y + 53, 28, 3, '#102d3026');
+
+    // Dark edged trousers, bent knees for sitting, and alternating walking feet.
+    if (seated) {
+      r(5, 34, 23, 8, outline);
+      r(7, 35, 19, 5, pants);
+      r(9, 40, 9, 14, outline);
+      r(10, 41, 6, 12, pantsShade);
+      r(8, 53, 12, 5, outline);
+      r(10, 54, 8, 2, '#665044');
+      r(17, 39, 11, 8, outline);
+      r(18, 40, 8, 5, pants);
+      r(21, 44, 7, 13, outline);
+      r(22, 45, 4, 11, pants);
+      r(21, 56, 12, 4, outline);
+      r(23, 57, 8, 2, '#765c49');
+    } else {
+      const leftLift = Math.max(0, stride);
+      const rightLift = Math.max(0, -stride);
+      r(5, 34, 22, 6, outline);
+      r(7, 36, 18, 4, pants);
+      r(6 + stride, 39, 9, 13 - leftLift, outline);
+      r(8 + stride, 39, 6, 12 - leftLift, pants);
+      r(8 + stride, 44, 2, 6 - leftLift, pantsShade);
+      r(17 - stride, 39, 10, 13 - rightLift, outline);
+      r(19 - stride, 39, 6, 12 - rightLift, pants);
+      r(23 - stride, 44, 2, 6 - rightLift, pantsShade);
+      r(5 + stride, 50 - leftLift, 11, 4, outline);
+      r(7 + stride, 51 - leftLift, 7, 2, '#765440');
+      r(18 - stride, 50 - rightLift, 12, 4, outline);
+      r(20 - stride, 51 - rightLift, 8, 2, '#765440');
+    }
+
+    // Sleeves and hands sit behind the jacket, with a small opposite arm swing.
+    r(2, 23 + armSwing, 6, 15, outline);
+    r(0, 28 + armSwing, 7, 13, outline);
+    r(2, 26 + armSwing, 4, 12, coatShade);
+    r(1, 36 + armSwing, 6, 8, outline);
+    r(2, 38 + armSwing, 4, 5, skin);
+    r(2, 38 + armSwing, 3, 2, skinLight);
+    r(24, 23 - armSwing, 6, 17, outline);
+    r(25, 26 - armSwing, 4, 12, coat);
+    r(25, 37 - armSwing, 6, 7, outline);
+    r(26, 38 - armSwing, 3, 5, skin);
+    r(27, 40 - armSwing, 2, 2, skinShade);
+    r(7, 18, 16, 3, outline);
+    r(4, 21, 23, 5, outline);
+    r(5, 25, 22, 12, outline);
+    r(8, 20, 14, 3, coat);
+    r(6, 23, 19, 12, coat);
+    r(7, 24, 3, 10, coatLight);
+    r(6, 33, 19, 2, coatShade);
+    r(18, 26, 2, 9, coatShade);
+    r(9, 30, 2, 3, coatShade);
+    r(11, 29, 2, 2, coatShade);
+    r(22, 30, 2, 3, coatShade);
+
+    // Stepped cream lapels reproduce the reference hero's shirt and orange V.
+    if (hero || client || medical) {
+      r(10, 19, 4, 3, '#f3e6bd');
+      r(12, 21, 5, 3, '#f3e6bd');
+      r(14, 24, 4, 3, '#e1d3ad');
+      r(19, 20, 4, 3, '#f3e6bd');
+      r(18, 23, 4, 3, '#f3e6bd');
+      r(17, 26, 3, 4, '#f3e6bd');
+      r(16, 24, 2, 3, outline);
+      if (medical) {
+        r(18, 29, 1, 6, '#839c8e');
+        r(21, 24, 3, 4, '#709b8b');
+        r(21, 25, 3, 1, '#e8e8ce');
+      }
+    } else {
+      r(13, 19, 7, 5, '#d7d5bd');
+      r(15, 20, 3, 3, '#a5b6a8');
+      r(19, 26, 5, 2, coatShade);
+    }
+
+    // Three quarter face, two vertical eyes, chestnut fringe and hard pixel edges.
+    r(7, 1, 18, 2, outline);
+    r(5, 3, 23, 5, outline);
+    r(4, 7, 25, 7, outline);
+    r(6, 13, 22, 3, outline);
+    r(9, 16, 17, 2, outline);
+    r(13, 17, 11, 3, outline);
+    r(10, 6, 17, 7, skin);
+    r(8, 12, 19, 3, skin);
+    r(11, 15, 14, 2, skin);
+    r(14, 17, 9, 2, skinShade);
+    r(15, 17, 7, 2, skin);
+    r(8, 10, 4, 4, skinLight);
+    r(11, 7, 15, 2, skinLight);
+    r(9, 14, 3, 2, skinShade);
+    r(23, 12, 2, 1, '#f39e75');
+    r(8, 0, 17, 1, outline);
+    r(6, 1, 21, 3, outline);
+    r(4, 4, 24, 3, outline);
+    r(3, 7, 7, 7, outline);
+    r(5, 13, 3, 3, outline);
+    r(8, 1, 17, 1, hairLight);
+    r(6, 2, 21, 3, hair);
+    r(5, 5, 22, 1, hair);
+    r(4, 6, 6, 7, hair);
+    r(6, 7, 5, 4, hair);
+    r(9, 6, 3, 2, hair);
+    r(10, 8, 2, 2, outline);
+    r(5, 11, 2, 3, hairLight);
+    r(14, 9, 3, 1, hair);
+    r(23, 9, 3, 1, hair);
+    r(14, 10, 2, 3, outline);
+    r(23, 10, 2, 3, outline);
+    if (client) {
+      r(1, 7, 4, 7, outline);
+      r(2, 8, 3, 5, hair);
+      r(5, 3, 3, 3, hairLight);
+    }
+    if (nurse) {
+      r(7, 0, 17, 4, outline);
+      r(8, 0, 15, 3, '#f4ecd1');
+      r(14, 0, 3, 3, '#749b87');
+      r(13, 1, 5, 1, '#749b87');
+    }
+    if (programmer) {
+      r(12, 9, 7, 5, outline);
+      r(21, 9, 7, 5, outline);
+      r(13, 10, 5, 3, '#b5c9b6');
+      r(22, 10, 5, 3, '#b5c9b6');
+      r(18, 10, 3, 1, outline);
+      r(15, 10, 1, 3, outline);
+      r(24, 10, 1, 3, outline);
+    }
   }
 
   bench(x, y) {
