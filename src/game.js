@@ -268,6 +268,45 @@ Hospital.Game = class {
   }
 
   rect(x, y, w, h, color) { this.ctx.fillStyle = color; this.ctx.fillRect(Math.round(x), Math.round(y), Math.round(w), Math.round(h)); }
+  pixelLine(x1, y1, x2, y2, color, width = 1) {
+    const steps = Math.max(1, Math.ceil(Math.max(Math.abs(x2 - x1), Math.abs(y2 - y1))));
+    for (let i = 0; i <= steps; i++) this.rect(x1 + (x2 - x1) * i / steps, y1 + (y2 - y1) * i / steps, width, width, color);
+  }
+
+  monitorActivity(x, y, w, h) {
+    const phase = this.time + x * .017 + y * .023;
+    const scan = (phase % 4) / 4;
+    this.rect(x + 2, y + scan * (h - 1), w - 4, 1, '#e0edc424');
+    if (phase % 1.8 < .9) this.rect(x + w - 6, y + h - 4, 3, 1, '#d2dfb5');
+  }
+
+  windowBird(x, y, w, h) {
+    if (x + w < this.camera || x > this.camera + this.canvas.width) return;
+    // A seeded chance per time interval avoids frame-rate-dependent random flicker.
+    const random = seed => { const value = Math.sin(seed * 127.1) * 43758.5453; return value - Math.floor(value); };
+    const seed = x * .37 + y * .73 + this.level * 97;
+    const time = this.time + random(seed + 2) * 18;
+    const cycle = Math.floor(time / 18);
+    if (random(seed + cycle * 13.7) >= .16) return;
+    const elapsed = time % 18 - (3 + random(seed + cycle * 7 + 18) * 10);
+    const duration = 2.2;
+    if (elapsed < 0 || elapsed > duration) return;
+    const progress = elapsed / duration;
+    const right = random(seed + cycle + 41) > .5;
+    const bx = x - 10 + (w + 20) * (right ? progress : 1 - progress);
+    const by = y + h * (.25 + random(seed + 7) * .25) + Math.sin(elapsed * 2.4) * 2;
+    const wing = Math.round(Math.sin(elapsed * 17) * 2);
+    const c = this.ctx;
+    c.save(); c.beginPath(); c.rect(x + 8, y + 8, w - 16, h - 16); c.clip();
+    this.rect(bx, by, 4, 2, '#718777');
+    this.rect(bx + (right ? 4 : -1), by, 1, 1, '#718777');
+    this.rect(bx - 2, by - wing, 3, 1, '#81927b');
+    this.rect(bx + 3, by - wing, 3, 1, '#81927b');
+    this.rect(bx - 4, by - wing * 2, 2, 1, '#81927b');
+    this.rect(bx + 6, by - wing * 2, 2, 1, '#81927b');
+    c.restore();
+  }
+
   text(text, x, y, size = 10, color = '#526b6a', align = 'left') {
     this.ctx.fillStyle = color;
     this.ctx.font = `${size}px "Segoe UI", sans-serif`;
@@ -755,6 +794,7 @@ Hospital.Game = class {
       this.rect(x + dx + 12, y + 21, 8, 3, '#c7d5ae');
       this.rect(x + dx + 19, y + 14, 3, 10, '#c7d5ae');
       this.rect(x + dx + 21, y + 24, 10, 3, '#c7d5ae');
+      this.monitorActivity(x + dx + 8, y + 8, 32, 27);
       this.rect(x + dx + 8, y + 43, 8, 4, '#d4a478');
       this.rect(x + dx + 22, y + 43, 8, 4, '#a1bc91');
     }
@@ -970,6 +1010,7 @@ Hospital.Game = class {
     this.rect(x + 22, y + 5, w - 44, 26, '#678b74');
     this.rect(x + 28, y + 11, w - 56, 3, '#bacba2');
     this.rect(x + 28, y + 20, w - 68, 3, '#9eb996');
+    this.monitorActivity(x + 22, y + 5, w - 44, 26);
     this.rect(x + w / 2 - 4, y + 37, 8, 7, '#4d765f');
   }
 
@@ -991,8 +1032,13 @@ Hospital.Game = class {
     const c = this.ctx;
     c.beginPath(); c.arc(x + w / 2, y + h / 2, Math.min(w, h) * .23, 0, Math.PI * 2); c.fillStyle = '#1b403c'; c.fill();
     c.beginPath(); c.arc(x + w / 2, y + h / 2, Math.min(w, h) * .14, 0, Math.PI * 2); c.fillStyle = '#769276'; c.fill();
-    this.rect(x + w / 2 - 2, y + h / 2 - 10, 4, 20, '#3b6353');
-    this.rect(x + w / 2 - 10, y + h / 2 - 2, 20, 4, '#3b6353');
+    const angle = this.time * .8 + x * .013;
+    const radius = Math.min(w, h) * .11;
+    for (let i = 0; i < 4; i++) {
+      const blade = angle + i * Math.PI / 2;
+      this.pixelLine(x + w / 2 - 1, y + h / 2 - 1, x + w / 2 + Math.cos(blade) * radius - 1, y + h / 2 + Math.sin(blade) * radius - 1, '#3b6353', 3);
+    }
+    this.rect(x + w / 2 - 2, y + h / 2 - 2, 5, 5, '#91a180');
     this.rect(x, y + h - 7, w, 7, '#4c7360');
     this.rect(x + 8, y - 7, 18, 20, '#527b62');
     this.rect(x + w - 26, y - 7, 18, 20, '#527b62');
@@ -1097,6 +1143,7 @@ Hospital.Game = class {
     this.rect(x - 2, y - 2, w + 4, h + 6, '#f2eccc');
     this.rect(x + 4, y + 4, w - 8, h - 8, '#d4d9b5');
     this.rect(x + 8, y + 8, w - 16, h - 16, '#f5ebbd');
+    this.windowBird(x, y, w, h);
     this.rect(x + Math.floor(w / 2) - 2, y, 5, h, '#c8c9a5');
     this.rect(x, y + Math.floor(h / 2), w, 5, '#c8c9a5');
     this.rect(x - 7, y + h + 3, w + 14, 5, '#b6c4a2');
@@ -1178,6 +1225,7 @@ Hospital.Game = class {
     this.rect(x, y + 55, w, 4, '#557f6a');
     this.rect(x + w - 53, y - 29, 42, 28, '#3e635c');
     this.rect(x + w - 50, y - 26, 36, 19, '#8eaf95');
+    this.monitorActivity(x + w - 50, y - 26, 36, 19);
     this.rect(x + w - 36, y - 4, 8, 5, '#385d56');
     [10, 21, 32].forEach((dx, i) => this.rect(x + dx, y - 21 + i * 2, 8, 21 - i * 2, ['#a4bca2', '#d2c6a0', '#86a99d'][i]));
   }
@@ -1214,6 +1262,8 @@ Hospital.Game = class {
     this.rect(x + 1, y + 10, 12, 26, '#d7dfbd');
     this.rect(x + 4, y + 26, 6, 8, '#99b9a4');
     this.rect(x + 7, y + 36, 1, 37, '#b7cbaa');
+    const drop = (this.time + x * .019) % 2.6;
+    if (drop < 1.7) this.rect(x + 7, y + 38 + drop / 1.7 * 31, 1, 3, '#749f8d');
     this.rect(x + 4, y + 96, 25, 3, '#547f6e');
   }
 
@@ -1302,6 +1352,7 @@ Hospital.Game = class {
     this.rect(x + 10, y + 70, 26, 46, '#a8c3ae');
     this.rect(x + 32, y + 53, 30, 63, '#aac6b0');
     this.rect(x + 70, y + 72, 30, 44, '#a3bea8');
+    this.windowBird(x, y, 114, 121);
     this.rect(x + 53, y + 1, 7, 120, '#e8e8d5');
     this.rect(x, y + 61, 114, 6, '#e5e6d1');
     this.rect(x - 9, y + 122, 132, 7, '#e5e5cf');
@@ -1349,6 +1400,12 @@ Hospital.Game = class {
     const pantsShade = hero ? '#3f302b' : '#303d42';
     const stride = walk && !seated ? Math.round(Math.sin(walk) * 2) : 0;
     const armSwing = stride ? Math.sign(stride) : 0;
+    // Portraits use a drawing brush without a clock, so they remain static.
+    const idle = !hero && !walk && !climbing && Number.isFinite(this.time);
+    const idleSeed = x * .13 + y * .07;
+    const breath = idle ? Math.sin(this.time * 1.65 + idleSeed) * .45 : 0;
+    const handDrift = idle ? Math.sin(this.time * .85 + idleSeed) * .45 : 0;
+    const blink = idle && (this.time + idleSeed) % (4.6 + Math.abs(Math.sin(idleSeed)) * 2) < .13;
     // Gameplay uses 1.5x artwork; interface portraits request the original 1x size.
     // Scale around the feet and round every edge to keep the pixel art sharp.
     const footY = seated ? 84 : 54;
@@ -1360,6 +1417,10 @@ Hospital.Game = class {
       this.rect(left, top, right - left, bottom - top, color);
     };
     const r = (dx, dy, w, h, color) => {
+      if (idle) {
+        if (dy < 34) dy += breath;
+        else if (dy >= 36 && (dx < 5 || dx >= 25)) dy += handDrift;
+      }
       const left = Math.round(dx * .75);
       const right = Math.round((dx + w) * .75);
       pixel(4 + (facing < 0 && !climbing ? 21 - right : left), (seated ? 24 : 0) + dy, Math.max(1, right - left), h, color);
@@ -1526,8 +1587,8 @@ Hospital.Game = class {
     r(5, 11, 2, 3, hairLight);
     r(14, 9, 3, 1, hair);
     r(23, 9, 3, 1, hair);
-    r(14, 10, 2, 3, outline);
-    r(23, 10, 2, 3, outline);
+    r(14, blink ? 11 : 10, 2, blink ? 1 : 3, outline);
+    r(23, blink ? 11 : 10, 2, blink ? 1 : 3, outline);
     if (client) {
       r(1, 7, 4, 7, outline);
       r(2, 8, 3, 5, hair);
@@ -1545,8 +1606,8 @@ Hospital.Game = class {
       r(13, 10, 5, 3, '#b5c9b6');
       r(22, 10, 5, 3, '#b5c9b6');
       r(18, 10, 3, 1, outline);
-      r(15, 10, 1, 3, outline);
-      r(24, 10, 1, 3, outline);
+      r(15, blink ? 11 : 10, 1, blink ? 1 : 3, outline);
+      r(24, blink ? 11 : 10, 1, blink ? 1 : 3, outline);
     }
   }
 
@@ -1560,10 +1621,11 @@ Hospital.Game = class {
   }
 
   plant(x, y) {
+    const sway = Math.sin(this.time * .85 + x * .031) * 1.6 + Math.sin(this.time * 1.4 + x * .013) * .4;
     this.rect(x + 11, y + 18, 28, 31, '#b18c68');
     this.rect(x + 7, y + 13, 36, 8, '#c7a27a');
-    this.rect(x + 23, y - 25, 5, 41, '#678565');
-    [[3, -20, 22, 10], [23, -34, 20, 12], [8, -42, 17, 13], [26, -13, 22, 11], [1, -4, 24, 10]].forEach(v => this.rect(x + v[0], y + v[1], v[2], v[3], '#789e74'));
+    for (let i = 0; i < 4; i++) this.rect(x + 23 + sway * (1 - i / 4), y - 25 + i * 10, 5, 11, '#678565');
+    [[3, -20, 22, 10], [23, -34, 20, 12], [8, -42, 17, 13], [26, -13, 22, 11], [1, -4, 24, 10]].forEach(([dx, dy, w, h]) => this.rect(x + dx + sway * (.45 - dy / 60), y + dy, w, h, '#789e74'));
   }
 
   cart(cart) {
@@ -1606,8 +1668,15 @@ Hospital.Game = class {
     const ctx = this.ctx;
     ctx.beginPath(); ctx.arc(x, y, 22, 0, Math.PI * 2); ctx.fillStyle = '#75958b'; ctx.fill();
     ctx.beginPath(); ctx.arc(x, y, 18, 0, Math.PI * 2); ctx.fillStyle = '#e1e2c9'; ctx.fill();
-    this.rect(x - 1, y - 12, 2, 13, '#668376');
-    this.rect(x, y - 1, 10, 2, '#668376');
+    for (let i = 0; i < 12; i++) {
+      const angle = i * Math.PI / 6;
+      this.rect(x + Math.sin(angle) * 15, y - Math.cos(angle) * 15, 1, 1, '#8d9e88');
+    }
+    const seconds = Math.floor(this.time);
+    const hand = (angle, length, color, width) => this.pixelLine(x, y, x + Math.sin(angle) * length, y - Math.cos(angle) * length, color, width);
+    hand(Math.PI / 2 + this.time / 43200 * Math.PI * 2, 9, '#668376', 2);
+    hand(this.time / 3600 * Math.PI * 2, 12, '#668376', 1);
+    hand(seconds / 60 * Math.PI * 2, 14, '#b18260', 1);
     this.rect(x - 1, y - 1, 3, 3, '#ad8460');
   }
 
