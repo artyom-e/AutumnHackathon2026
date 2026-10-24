@@ -546,7 +546,7 @@ Hospital.Game = class {
     this.receptionPlant(2420, 416);
     this.receptionNotices(2500, 302);
     this.receptionWaterCooler(2670, 384);
-    this.receptionMedicalCabinet(2760, 300);
+    this.bankATM(this.goal - 102, 466);
     this.receptionPlant(2870, 416);
     this.receptionBin(2615, 433);
     this.clock(2350, 272);
@@ -732,6 +732,7 @@ Hospital.Game = class {
     this.diagnosticMap.platforms.forEach(platform => this.receptionPlatform(platform));
     this.receptionPlatform(this.diagnosticMap.lift, true);
     this.diagnosticMap.platforms.filter(platform => platform.type === 'gallery').forEach(platform => this.receptionRailing(platform.x, platform.y, platform.w));
+    this.bankATM(this.goal - 36, 172);
     this.diagnosticMap.ladders.forEach(ladder => this.diagnosticLadder(ladder));
     this.puddles.forEach(puddle => {
       this.rect(puddle.x, 463, puddle.w, 7, '#4c9293');
@@ -1211,6 +1212,66 @@ Hospital.Game = class {
     this.rect(x + 4, y + 62, 46, 4, '#7a9b80');
   }
 
+  bankATM(x, floorY) {
+    const y = floorY - 118;
+    const c = this.ctx;
+    // A restrained warm glow separates the green-and-yellow kiosk from the ward.
+    c.save();
+    const glow = c.createRadialGradient(x + 34, y + 56, 18, x + 34, y + 56, 85);
+    glow.addColorStop(0, '#f1d76b19'); glow.addColorStop(1, '#f1d76b00');
+    c.fillStyle = glow; c.fillRect(x - 51, y - 29, 170, 170);
+    c.restore();
+    const r = (dx, dy, w, h, color) => this.rect(x + dx, y + dy, w, h, color);
+
+    r(-5, 115, 81, 5, '#183d3530');
+    r(5, 0, 59, 118, '#294b33');
+    r(0, 6, 68, 107, '#294b33');
+    r(3, 7, 62, 104, '#73982e');
+    r(7, 3, 54, 111, '#ddc44f');
+    r(5, 11, 4, 96, '#a8bd47');
+    r(60, 11, 4, 96, '#527628');
+    r(9, 5, 49, 3, '#f0dc7a');
+
+    // Bank header, recessed touch screen and the stepped green screen surround.
+    r(10, 10, 48, 52, '#557f2a');
+    r(13, 11, 5, 5, '#e0ce64');
+    r(14, 12, 1, 3, '#73982e');
+    r(16, 13, 1, 3, '#73982e');
+    this.text('БАНК', x + 29, y + 16, 5.5, '#eedd8a', 'center');
+    this.text('ЦЕНТР-ИНВЕСТ', x + 34, y + 24, 5.7, '#f1dc78', 'center');
+    r(12, 28, 44, 32, '#234b3d');
+    r(14, 30, 40, 28, '#b9d8c0');
+    r(16, 32, 36, 5, '#e0e9cf');
+    r(18, 33, 3, 3, '#6b9d57');
+    r(23, 34, 21, 1, '#92b28e');
+    [0, 1, 2].forEach(row => [0, 1].forEach(col => {
+      r(17 + col * 18, 40 + row * 5, 15, 3, '#759f74');
+      r(19 + col * 18, 41 + row * 5, 9, 1, '#d8e6c7');
+    }));
+    this.monitorActivity(x + 14, y + 30, 40, 28);
+
+    r(13, 62, 41, 4, '#557f2a');
+    r(18, 66, 32, 18, '#608c30');
+    r(24, 68, 20, 12, '#335c31');
+    r(26, 70, 15, 8, '#c0bf87');
+    for (let row = 0; row < 3; row++) for (let col = 0; col < 3; col++) r(28 + col * 4, 71 + row * 2, 2, 1, '#697b58');
+    r(6, 68, 10, 16, '#a89a3d');
+    r(8, 70, 7, 5, '#d68c4c');
+    r(8, 76, 7, 6, '#a75832');
+    r(53, 68, 8, 3, '#365232');
+
+    r(12, 90, 20, 9, '#a8b544');
+    r(15, 93, 14, 2, '#53742e');
+    r(37, 86, 21, 18, '#669333');
+    r(40, 89, 15, 11, '#496b2c');
+    r(42, 93, 11, 2, '#203d2c');
+    r(43, 91, 8, 1, '#e5bd62');
+    r(14, 106, 40, 5, '#e4e3af');
+    r(18, 108, 31, 1, '#82945c');
+    r(9, 112, 50, 4, '#628b32');
+    r(13, 116, 42, 2, '#385e30');
+  }
+
   receptionBin(x, y) {
     this.rect(x, y, 25, 4, '#416f63');
     this.rect(x + 2, y + 4, 21, 27, '#88a98d');
@@ -1378,7 +1439,36 @@ Hospital.Game = class {
     if (this.invulnerable > 0 && Math.floor(this.time * 12) % 2 === 0) return;
     const p = this.player;
     const motion = p.climbing ? p.climbPhase : p.grounded && Math.abs(p.vx) > 0 ? this.time * 13 : 0;
-    this.person(p.x, p.y, '#df9867', p.facing, motion, true, false, '', p.climbing);
+    // Cache the current pixel pose, then draw a one-pixel warm outline behind it.
+    if (!this.heroVisual) {
+      const sprite = document.createElement('canvas'); sprite.width = 64; sprite.height = 100;
+      const silhouette = document.createElement('canvas'); silhouette.width = 64; silhouette.height = 100;
+      this.heroVisual = { sprite, silhouette, pose: '' };
+    }
+    const visual = this.heroVisual;
+    const pose = `${p.facing}/${p.climbing}/${Math.round(Math.sin(motion) * 2)}`;
+    if (visual.pose !== pose) {
+      const spriteContext = visual.sprite.getContext('2d');
+      spriteContext.clearRect(0, 0, 64, 100);
+      const brush = { rect: (x, y, w, h, color) => { spriteContext.fillStyle = color; spriteContext.fillRect(Math.round(x), Math.round(y), Math.round(w), Math.round(h)); } };
+      this.person.call(brush, 18, 32, '#df9867', p.facing, motion, true, false, '', p.climbing);
+      const mask = visual.silhouette.getContext('2d');
+      mask.clearRect(0, 0, 64, 100);
+      mask.globalCompositeOperation = 'source-over'; mask.fillStyle = '#f4d29c'; mask.fillRect(0, 0, 64, 100);
+      mask.globalCompositeOperation = 'destination-in'; mask.drawImage(visual.sprite, 0, 0);
+      mask.globalCompositeOperation = 'source-over';
+      visual.pose = pose;
+    }
+    const c = this.ctx;
+    const x = Math.round(p.x - 18), y = Math.round(p.y - 32);
+    c.save();
+    const glow = c.createRadialGradient(p.x + 14, p.y + 12, 8, p.x + 14, p.y + 12, 52);
+    glow.addColorStop(0, '#ffcf8a16'); glow.addColorStop(1, '#ffcf8a00');
+    c.fillStyle = glow; c.fillRect(p.x - 38, p.y - 40, 104, 104);
+    c.globalAlpha = .65;
+    for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) c.drawImage(visual.silhouette, x + dx, y + dy);
+    c.globalAlpha = 1; c.drawImage(visual.sprite, x, y);
+    c.restore();
   }
 
   person(x, y, shirt, facing = 1, walk = 0, hero = false, seated = false, role = '', climbing = false, scale = 1.5) {
@@ -1393,10 +1483,10 @@ Hospital.Game = class {
     const skinShade = skin === '#dba17c' ? '#bb7d60' : '#e99a73';
     const hair = programmer ? '#493b36' : seated && shirt === '#7e9f9b' ? '#6e6b63' : '#674236';
     const hairLight = programmer ? '#655047' : seated && shirt === '#7e9f9b' ? '#969084' : '#855847';
-    const coat = hero ? '#c35428' : medical ? nurse ? '#dce2c7' : '#eee7cd' : shirt;
-    const coatShade = hero ? '#933e24' : medical ? '#9aaf9d' : programmer ? '#496a71' : '#586e70';
-    const coatLight = hero ? '#df7137' : medical ? '#f6efd8' : programmer ? '#91afb0' : '#b6b9aa';
-    const pants = hero ? '#584437' : medical ? '#5c7168' : '#465156';
+    const coat = hero ? scale > 1 ? '#d9632e' : '#c35428' : medical ? nurse ? '#dce2c7' : '#eee7cd' : shirt;
+    const coatShade = hero ? scale > 1 ? '#a34727' : '#933e24' : medical ? '#9aaf9d' : programmer ? '#496a71' : '#586e70';
+    const coatLight = hero ? scale > 1 ? '#f58a49' : '#df7137' : medical ? '#f6efd8' : programmer ? '#91afb0' : '#b6b9aa';
+    const pants = hero ? scale > 1 ? '#645043' : '#584437' : medical ? '#5c7168' : '#465156';
     const pantsShade = hero ? '#3f302b' : '#303d42';
     const stride = walk && !seated ? Math.round(Math.sin(walk) * 2) : 0;
     const armSwing = stride ? Math.sign(stride) : 0;
