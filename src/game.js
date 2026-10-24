@@ -31,7 +31,7 @@ Hospital.Game = class {
     this.level = index;
     this.worldWidth = index === 0 ? 3000 : index === 1 ? 3200 : 3400;
     this.goal = this.worldWidth - 155;
-    this.player = { x: 100, y: index === 2 ? 196 : 405, w: 28, h: 54, vx: 0, vy: 0, grounded: false, facing: 1 };
+    this.player = { x: 100, y: index === 2 ? 196 : 405, w: 28, h: 54, vx: 0, vy: 0, grounded: false, facing: 1, climbing: false, climbPhase: 0 };
     this.checkpoint = 100;
     this.checkpointY = index === 2 ? 196 : 380;
     this.camera = 0;
@@ -355,7 +355,7 @@ Hospital.Game = class {
     this.text('!', this.goal + 30, markerY + 1, 18, '#4b5c4c', 'center');
     this.text(['ЗАКАЗЧИК', 'ТВОЁ РАБОЧЕЕ МЕСТО', 'ПРОГРАММИСТ'][this.level], this.goal + 30, 252, 9, '#3b6b5d', 'center');
     const p = this.player;
-    if (this.invulnerable <= 0 || Math.floor(this.time * 12) % 2) this.person(p.x, p.y, '#df9867', p.facing, p.grounded && Math.abs(p.vx) > 0 ? this.time * 13 : 0, true);
+    this.drawPlayer();
     if (p.x < 260 && !this.paused) {
       this.text('ТЫ', p.x + 14, p.y - 15, 8, '#456b61', 'center');
       this.text('→', p.x + 68, p.y + 20, 22, '#ab7655', 'center');
@@ -515,13 +515,12 @@ Hospital.Game = class {
     this.receptionDoor(this.goal - 28, clientFloor, true);
     this.person(this.goal - 82, clientFloor - 54, '#e7e9d2', -1, 0, false, false, 'client');
     const bob = Math.sin(this.time * 2.7) * 3;
-    const bubbleY = clientFloor - 90 + bob;
+    const bubbleY = clientFloor - 117 + bob;
     this.rect(this.goal - 80, bubbleY, 29, 20, '#e4a16d');
     this.rect(this.goal - 77, bubbleY + 19, 6, 5, '#e4a16d');
     [0, 1, 2].forEach(i => this.rect(this.goal - 75 + i * 7, bubbleY + 9, 4, 4, '#365753'));
 
-    const p = this.player;
-    if (this.invulnerable <= 0 || Math.floor(this.time * 12) % 2) this.person(p.x, p.y, '#df9867', p.facing, p.grounded && Math.abs(p.vx) > 0 ? this.time * 13 : 0, true);
+    this.drawPlayer();
     c.restore();
   }
 
@@ -558,7 +557,9 @@ Hospital.Game = class {
       p.x = ladder.x + (ladder.w - p.w) / 2;
       p.vx = 0;
       p.vy = (Number(down) - Number(up)) * 155;
+      const previousY = p.y;
       p.y = Math.max(ladder.y - p.h, Math.min(ladder.y + ladder.h - p.h, p.y + p.vy * dt));
+      p.climbPhase += (p.y - previousY) / 9;
       p.grounded = p.y + p.h === ladder.y || p.y + p.h === ladder.y + ladder.h;
       if (p.grounded) { p.climbing = false; p.vy = 0; }
       this.jumpBuffer = this.coyote = 0;
@@ -708,8 +709,7 @@ Hospital.Game = class {
     this.rect(this.goal - 10, markerY + 5, 21, 12, '#365753');
     this.rect(this.goal - 7, markerY + 7, 15, 7, '#b8cdb0');
     this.rect(this.goal - 2, markerY + 17, 5, 4, '#365753');
-    const p = this.player;
-    if (this.invulnerable <= 0 || Math.floor(this.time * 12) % 2) this.person(p.x, p.y, '#df9867', p.facing, p.grounded && Math.abs(p.vx) > 0 ? this.time * 13 : 0, true);
+    this.drawPlayer();
     c.restore();
   }
 
@@ -902,12 +902,11 @@ Hospital.Game = class {
     this.technicalGate();
     this.carts.forEach(cart => this.cart(cart));
 
-    const bubbleY = 350 + Math.sin(this.time * 2.7) * 3;
+    const bubbleY = 323 + Math.sin(this.time * 2.7) * 3;
     this.rect(this.goal - 64, bubbleY, 29, 20, '#dfa16c');
     this.rect(this.goal - 61, bubbleY + 19, 6, 5, '#dfa16c');
     [0, 1, 2].forEach(i => this.rect(this.goal - 59 + i * 7, bubbleY + 9, 4, 4, '#365753'));
-    const p = this.player;
-    if (this.invulnerable <= 0 || Math.floor(this.time * 12) % 2) this.person(p.x, p.y, '#df9867', p.facing, p.grounded && Math.abs(p.vx) > 0 ? this.time * 13 : 0, true);
+    this.drawPlayer();
     c.restore();
   }
 
@@ -1324,7 +1323,14 @@ Hospital.Game = class {
     this.rect(x - 3, 464, 102, 3, '#577866');
   }
 
-  person(x, y, shirt, facing = 1, walk = 0, hero = false, seated = false, role = '') {
+  drawPlayer() {
+    if (this.invulnerable > 0 && Math.floor(this.time * 12) % 2 === 0) return;
+    const p = this.player;
+    const motion = p.climbing ? p.climbPhase : p.grounded && Math.abs(p.vx) > 0 ? this.time * 13 : 0;
+    this.person(p.x, p.y, '#df9867', p.facing, motion, true, false, '', p.climbing);
+  }
+
+  person(x, y, shirt, facing = 1, walk = 0, hero = false, seated = false, role = '', climbing = false, scale = 1.5) {
     // One pixel grid and outline palette keep every character in the same style.
     const outline = '#111c25';
     const nurse = role === 'nurse';
@@ -1343,13 +1349,76 @@ Hospital.Game = class {
     const pantsShade = hero ? '#3f302b' : '#303d42';
     const stride = walk && !seated ? Math.round(Math.sin(walk) * 2) : 0;
     const armSwing = stride ? Math.sign(stride) : 0;
-    const originY = y + (seated ? 24 : 0);
+    // Gameplay uses 1.5x artwork; interface portraits request the original 1x size.
+    // Scale around the feet and round every edge to keep the pixel art sharp.
+    const footY = seated ? 84 : 54;
+    const pixel = (dx, dy, w, h, color) => {
+      const left = Math.round(x + 14 + (dx - 14) * scale);
+      const top = Math.round(y + footY + (dy - footY) * scale);
+      const right = Math.round(x + 14 + (dx + w - 14) * scale);
+      const bottom = Math.round(y + footY + (dy + h - footY) * scale);
+      this.rect(left, top, right - left, bottom - top, color);
+    };
     const r = (dx, dy, w, h, color) => {
       const left = Math.round(dx * .75);
       const right = Math.round((dx + w) * .75);
-      this.rect(x + 4 + (facing < 0 ? 21 - right : left), originY + dy, Math.max(1, right - left), h, color);
+      pixel(4 + (facing < 0 && !climbing ? 21 - right : left), (seated ? 24 : 0) + dy, Math.max(1, right - left), h, color);
     };
-    this.rect(x + 1, seated ? originY + 58 : y + 53, 28, 3, '#102d3026');
+    if (!climbing) pixel(1, seated ? 82 : 53, 28, 3, '#102d3026');
+
+    if (climbing) {
+      const reach = Math.round(Math.sin(walk) * 2);
+      const leftLift = Math.max(0, reach);
+      const rightLift = Math.max(0, -reach);
+
+      // Bent legs and raised hands alternate as the player moves along the rungs.
+      r(6, 35, 21, 6, outline);
+      r(8, 36, 17, 4, pants);
+      r(5 - leftLift, 39 - leftLift, 10, 12, outline);
+      r(7 - leftLift, 39 - leftLift, 6, 10, pants);
+      r(8 - leftLift, 43 - leftLift, 3, 6, pantsShade);
+      r(18 + rightLift, 39 - rightLift, 10, 12, outline);
+      r(20 + rightLift, 39 - rightLift, 6, 10, pants);
+      r(23 + rightLift, 43 - rightLift, 2, 6, pantsShade);
+      r(4 - leftLift, 49 - leftLift, 12, 5, outline);
+      r(6 - leftLift, 50 - leftLift, 8, 2, '#765440');
+      r(18 + rightLift, 49 - rightLift, 12, 5, outline);
+      r(20 + rightLift, 50 - rightLift, 8, 2, '#765440');
+
+      r(2, 16 + reach, 7, 15, outline);
+      r(4, 18 + reach, 4, 11, coatLight);
+      r(2, 12 + reach, 6, 7, outline);
+      r(3, 13 + reach, 4, 5, skin);
+      r(3, 13 + reach, 3, 2, skinLight);
+      r(24, 16 - reach, 7, 15, outline);
+      r(25, 18 - reach, 4, 11, coatShade);
+      r(25, 12 - reach, 6, 7, outline);
+      r(26, 13 - reach, 4, 5, skin);
+      r(27, 14 - reach, 2, 3, skinShade);
+
+      // Jacket seams and a full head of hair make the back view unambiguous.
+      r(7, 18, 18, 5, outline);
+      r(5, 22, 23, 15, outline);
+      r(7, 22, 19, 13, coat);
+      r(8, 23, 3, 10, coatLight);
+      r(23, 24, 2, 10, coatShade);
+      r(7, 33, 19, 2, coatShade);
+      r(11, 26, 11, 1, coatShade);
+      r(16, 29, 1, 4, coatLight);
+      r(11, 19, 11, 3, '#f3e6bd');
+      r(7, 1, 18, 2, outline);
+      r(5, 3, 23, 5, outline);
+      r(4, 7, 25, 8, outline);
+      r(6, 14, 21, 4, outline);
+      r(10, 17, 13, 3, outline);
+      r(8, 2, 16, 2, hairLight);
+      r(6, 4, 21, 9, hair);
+      r(5, 8, 3, 6, hairLight);
+      r(8, 13, 17, 3, hair);
+      r(11, 16, 11, 2, hair);
+      r(14, 18, 7, 1, skinShade);
+      return;
+    }
 
     // Dark edged trousers, bent knees for sitting, and alternating walking feet.
     if (seated) {

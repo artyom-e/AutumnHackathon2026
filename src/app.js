@@ -45,7 +45,7 @@
       canvas.width = 36; canvas.height = 37;
       const ctx = canvas.getContext('2d');
       const brush = { rect(x, y, w, h, color) { ctx.fillStyle = color; ctx.fillRect(Math.round(x), Math.round(y), Math.round(w), Math.round(h)); } };
-      H.Game.prototype.person.call(brush, 3, 1, people[who].shirt, who === 'hero' ? 1 : -1, 0, who === 'hero', false, who === 'client' ? 'client' : '');
+      H.Game.prototype.person.call(brush, 3, 1, people[who].shirt, who === 'hero' ? 1 : -1, 0, who === 'hero', false, who === 'client' ? 'client' : '', false, 1);
       portraits.set(who, canvas.toDataURL());
     }
     return `<img class="pixel-portrait" src="${portraits.get(who)}" alt="" width="72" height="74">`;
