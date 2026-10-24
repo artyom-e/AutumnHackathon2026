@@ -12,6 +12,8 @@ window.Hospital = window.Hospital || {};
     'off-hours': { label: 'Сообщить: врач не работает', kind: 'error', icon: 'alert' },
     occupied: { label: 'Сообщить: время занято', kind: 'error', icon: 'alert' },
     release: { label: 'Освободить время', kind: 'check', icon: 'undo' },
+    'auto-reschedule': { label: 'Выбрать другое время автоматически', kind: 'data', icon: 'calendar', extra: true },
+    'clear-day': { label: 'Освободить весь день врача', kind: 'check', icon: 'undo', extra: true },
   };
   const paths = {
     file: '<path d="M6 3h8l4 4v14H6z M14 3v5h4 M9 12h6 M9 16h6"/>',
@@ -28,10 +30,23 @@ window.Hospital = window.Hospital || {};
   const icon = name => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" stroke-linejoin="miter" aria-hidden="true">${paths[name] || paths.file}</svg>`;
   const known = id => Object.hasOwn(cards, id);
   const emptySlots = () => Array(5).fill(null);
+  const paletteOrder = {
+    easy: ['input', 'schedule', 'available', 'book', 'notify', 'off-hours', 'occupied', 'release'],
+    medium: ['notify', 'occupied', 'schedule', 'release', 'input', 'book', 'off-hours', 'available'],
+    hard: ['occupied', 'auto-reschedule', 'notify', 'schedule', 'release', 'input', 'clear-day', 'book', 'available', 'off-hours'],
+  };
+  const mediumPrompts = { 0: 'Входные данные', 1: 'Проверка', 2: 'Условие', 3: 'Действие', 4: 'Результат', schedule: 'Действие на ветке', available: 'Действие на ветке', cancel: 'Действие на ветке' };
+  const instructions = {
+    easy: 'Собери ветки записи и отмены. При отмене освободи время для другого пациента.',
+    medium: 'Собери ветки записи и отмены. Общие подписи помогут; точные правила есть в ТЗ.',
+    hard: 'Восстанови алгоритм по ТЗ. Из 10 карточек нужны 8: две лишние. Цвета и подписи мест не подсказывают решение.',
+  };
 
   H.validateDiagram = function (slots, branches) {
     const missing = slots.findIndex(id => !id);
     if (missing !== -1) return { ok: false, node: `slot-${missing}`, message: 'Здесь пока пусто. Перенеси сюда подходящий блок слева.' };
+    const extra = [...slots.map((id, index) => [id, `slot-${index}`]), ...Object.entries(branches).map(([key, id]) => [id, `branch-${key}`])].find(([id]) => cards[id]?.extra);
+    if (extra) return { ok: false, node: extra[1], message: extra[0] === 'auto-reschedule' ? 'В ТЗ нет автоматического переноса: при отказе нужно объяснить причину, а не выбирать время за пациента.' : 'Отмена одного приёма не должна освобождать весь день врача. Остальные записи нужно сохранить.' };
     const invalid = slots.findIndex(id => !Object.hasOwn(H.blocks, id));
     if (invalid !== -1) return { ok: false, node: `slot-${invalid}`, message: 'Этот блок нужен на другой ветке. На основном пути собери действия от получения данных до подтверждения.' };
     const duplicate = slots.findIndex((id, i) => slots.indexOf(id) !== i);
@@ -113,11 +128,13 @@ window.Hospital = window.Hospital || {};
     }
 
     node(key, nodeId, style, placeholder, shape = '') {
+      const difficulty = H.normalizeDifficulty(this.state().difficulty);
+      const prompt = difficulty === 'hard' ? 'Поставить карточку' : difficulty === 'medium' ? mediumPrompts[key] : placeholder;
       const id = this.getSlot(key);
       const card = cards[id];
-      const title = card ? card.label : placeholder;
+      const title = card ? card.label : prompt;
       return `<div class="flow-node ${shape} ${card ? `filled kind-${card.kind}` : 'empty'} ${this.errorNode === nodeId ? 'node-error' : ''}" style="${style}" data-slot="${key}" data-node="${nodeId}" ${card ? `draggable="true" data-card="${id}" data-source="${key}"` : ''}>
-        <button class="node-target" data-design="place" data-destination="${key}" aria-label="${card ? `${title}. Заменить блок` : `Поставить блок: ${placeholder}`}"><span class="node-icon">${icon(card?.icon || (shape ? 'clock' : 'plus'))}</span><span>${title}</span></button>
+        <button class="node-target" data-design="place" data-destination="${key}" aria-label="${card ? `${title}. Заменить блок` : `Поставить блок: ${prompt}`}"><span class="node-icon">${icon(card?.icon || (shape && difficulty !== 'hard' ? 'clock' : 'plus'))}</span><span>${title}</span></button>
         ${card ? `<button class="node-remove" data-design="remove" data-destination="${key}" aria-label="Убрать: ${title}">×</button>` : ''}
       </div>`;
     }
@@ -125,6 +142,7 @@ window.Hospital = window.Hospital || {};
     render() {
       const state = this.state();
       if (state.stage !== 'puzzle') return;
+      const difficulty = H.normalizeDifficulty(state.difficulty);
       const scrollSelectors = ['.design-body', '.flow-scroll', '.palette-items', '.design-palette'];
       if (this.overlay.classList.contains('design-overlay')) this.scrollPositions = scrollSelectors.map(selector => {
         const element = this.overlay.querySelector(selector);
@@ -132,13 +150,16 @@ window.Hospital = window.Hospital || {};
       });
       const complete = this.validated;
       const filled = state.flowSlots.filter(Boolean).length + ['schedule', 'available', 'cancel'].filter(key => known(state.branches[key])).length;
-      const palette = Object.entries(cards).map(([id, card], index) => `<button class="palette-card kind-${card.kind}${this.selected === id ? ' selected' : ''}" data-design="select" data-card="${id}" draggable="true" aria-pressed="${this.selected === id}"><span>${icon(card.icon)}</span><span class="palette-label">${card.label}</span><small class="palette-index" aria-hidden="true">${index + 1}</small></button>`).join('');
+      const palette = paletteOrder[difficulty].map((id, index) => {
+        const card = cards[id];
+        return `<button class="palette-card kind-${card.kind}${this.selected === id ? ' selected' : ''}" data-design="select" data-card="${id}" draggable="true" aria-pressed="${this.selected === id}"><span>${icon(card.icon)}</span><span class="palette-label">${card.label}</span>${difficulty === 'easy' ? `<small class="palette-index" aria-hidden="true">${index + 1}</small>` : ''}</button>`;
+      }).join('');
       const wire = (from, to, d, kind = 'yes') => `<path class="flow-wire wire-${kind}" data-from="${from}" data-to="${to}" d="${d}" marker-end="url(#arrow-${kind})"/>`;
       this.showModal('puzzle', `
         <header class="design-header"><div class="design-brand"><span class="design-cross" aria-hidden="true">✚</span><strong>БОЛЬНИЦА №8</strong><span>/ КАБИНЕТ АНАЛИТИКА</span></div><span class="design-user">ПРОЕКТИРОВАНИЕ РЕШЕНИЯ</span><span class="window-pixels" aria-hidden="true"><i></i><i></i><i></i></span></header>
         <div class="design-body">
           <aside class="design-palette"><h3>${icon('file')} Карточки алгоритма</h3><div class="palette-items">${palette}</div><p class="palette-help">Перетащи карточку на схему.<br>Или выбери её и нажми на нужное место.</p></aside>
-          <section class="design-center" aria-label="Поле схемы"><div class="design-document"><div><small>РАБОЧИЙ ЛИСТ · ТЗ №001</small><strong id="modal-title">Схема записи пациента</strong></div><span class="design-progress" aria-label="Размещено ${filled} из 8 блоков"><span>${filled}/8</span>${Array.from({ length: 8 }, (_, index) => `<i class="${index < filled ? 'filled' : ''}"></i>`).join('')}</span></div><div class="design-instruction"><span>${this.selected ? `Выбрана карточка «${cards[this.selected].label}». Нажми на место в схеме.` : 'Собери ветки записи и отмены. При отмене освободи время для другого пациента.'}</span><small class="mobile-pan-hint">Схему можно листать влево и вправо ↔</small></div>
+          <section class="design-center" aria-label="Поле схемы"><div class="design-document"><div><small>РАБОЧИЙ ЛИСТ · ТЗ №001 · ${H.difficulties[difficulty].name.toUpperCase()}</small><strong id="modal-title">Схема записи пациента</strong></div><span class="design-progress" aria-label="Размещено ${filled} из 8 блоков"><span>${filled}/8</span>${Array.from({ length: 8 }, (_, index) => `<i class="${index < filled ? 'filled' : ''}"></i>`).join('')}</span></div><div class="design-instruction"><span>${this.selected ? `Выбрана карточка «${cards[this.selected].label}». Нажми на место в схеме.` : instructions[difficulty]}</span><small class="mobile-pan-hint">Схему можно листать влево и вправо ↔</small></div>
             <div class="design-feedback ${this.errorNode ? 'is-error' : 'is-success'}" role="status" ${this.feedback ? '' : 'hidden'}>${this.feedback}</div><div class="flow-scroll"><div class="flow-canvas">
               <svg class="flow-wires" viewBox="0 0 1000 900" preserveAspectRatio="none" aria-hidden="true"><defs>${['yes', 'no', 'neutral'].map(kind => `<marker id="arrow-${kind}" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M1 1 6 4 1 7" fill="none" stroke="${kind === 'no' ? '#a66c52' : '#52745d'}" stroke-width="1.5"/></marker>`).join('')}</defs>
               ${wire('start', 'slot-0', 'M500 63 V90', 'neutral')}${wire('slot-0', 'operation', 'M500 153 V180', 'neutral')}
@@ -152,11 +173,11 @@ window.Hospital = window.Hospital || {};
               <div class="flow-terminal start" data-node="start" style="left:39%;top:2%;width:22%;height:5%">${icon('play')} Начало</div>
               ${this.node('0', 'slot-0', 'left:35.5%;top:10%;width:29%;height:7%', 'Данные пациента')}
               <div class="flow-decision" data-node="operation" style="left:35.5%;top:20%;width:29%;height:10%"><span>Пациент отменяет<br>запись?</span></div>
-              <span class="wire-label yes" style="left:68%;top:22%">Да</span><span class="wire-label" style="left:51%;top:31%">Нет · новая запись</span>
+              <span class="wire-label yes" style="left:68%;top:22%">Да</span><span class="wire-label" style="left:51%;top:31%">${difficulty === 'hard' ? 'Нет' : 'Нет · новая запись'}</span>
               ${this.node('cancel', 'branch-cancel', 'left:75%;top:21%;width:23%;height:8%', 'Что сделать со временем?')}
               <div class="flow-terminal" data-node="end-cancel" style="left:77%;top:34%;width:19%;height:5%">${icon('stop')} Конец</div>
               ${this.node('1', 'slot-1', 'left:35.5%;top:34%;width:29%;height:7%', 'Первая проверка')}
-              <div class="flow-decision" data-node="decision" style="left:35.5%;top:44%;width:29%;height:10%"><span>Врач работает<br>в это время?</span></div>
+              <div class="flow-decision" data-node="decision" style="left:35.5%;top:44%;width:29%;height:10%"><span>${difficulty === 'hard' ? 'Проверка<br>пройдена?' : 'Врач работает<br>в это время?'}</span></div>
               <span class="wire-label yes" style="left:28%;top:46%">Да</span><span class="wire-label no" style="left:70%;top:46%">Нет</span>
               ${this.node('2', 'slot-2', 'left:13%;top:61%;width:25%;height:10%', 'Свободно ли время?', 'diamond')}
               <span class="wire-label yes" style="left:12%;top:72%">Да</span><span class="wire-label no" style="left:41%;top:65%">Нет</span>
@@ -174,7 +195,7 @@ window.Hospital = window.Hospital || {};
         <footer class="design-footer"><button class="design-button" data-design="notebook">← Техническое задание</button><span class="design-footer-note" role="status">Пациентов проверим после передачи программисту</span><div><button class="design-button" data-design="undo" ${!this.history.length ? 'disabled' : ''}>↶ Отменить</button><button class="design-button" data-design="reset">↻ Сбросить</button><button class="design-button primary" data-design="${complete ? 'finish' : 'verify'}">${complete ? 'Передать программисту →' : 'Проверить решение'}</button></div></footer>
       `, true);
       this.overlay.classList.add('design-overlay');
-      this.overlay.querySelector('.modal').classList.add('design-workspace');
+      this.overlay.querySelector('.modal').classList.add('design-workspace', `difficulty-${difficulty}`);
       document.body.appendChild(this.overlay);
       document.body.classList.add('designer-open');
       (this.scrollPositions || []).forEach(({ selector, top, left }) => {

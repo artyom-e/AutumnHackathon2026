@@ -57,7 +57,7 @@ body.designer-open { overflow: hidden; }
 .design-instruction { min-height: 45px; padding: 11px 23px; border-bottom: 1px solid #d8dec8; color: #687c64; font-size: 12px; line-height: 1.6; }
 .mobile-pan-hint { display: none; }
 .flow-scroll { min-height: 0; overflow: auto; scrollbar-width: thin; scrollbar-color: #9eb28e #f4f2e1; }
-.flow-canvas { position: relative; height: 100%; min-height: 740px; min-width: 820px; background-color: #fffdf0; background-image: linear-gradient(90deg, transparent 25px, #c4986b44 25px, #c4986b44 26px, transparent 26px), linear-gradient(#c5cdb344 1px, transparent 1px), linear-gradient(90deg, #c5cdb344 1px, transparent 1px); background-size: 100% 100%, 28px 28px, 28px 28px; }
+.flow-canvas { position: relative; height: 100%; min-height: 720px; min-width: 820px; background-color: #fffdf0; background-image: linear-gradient(90deg, transparent 25px, #c4986b44 25px, #c4986b44 26px, transparent 26px), linear-gradient(#c5cdb344 1px, transparent 1px), linear-gradient(90deg, #c5cdb344 1px, transparent 1px); background-size: 100% 100%, 28px 28px, 28px 28px; }
 .flow-canvas .flow-wires { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
 .flow-wire { fill: none; stroke: #67845e; stroke-width: 2; vector-effect: non-scaling-stroke; }
 .wire-no { stroke: #ad775b; }
@@ -96,6 +96,12 @@ body.designer-open { overflow: hidden; }
 .design-button:active { transform: translate(2px, 2px); box-shadow: none; }
 .design-button.primary { min-width: 190px; background: #3d766c; color: #faf5df; border-color: #244448; box-shadow: 2px 2px 0 #244448; }
 .design-button.primary:hover { background: #477f70; }
+.difficulty-hard .palette-card, .difficulty-hard .flow-node.filled { --card-border: #7e8d75; --card-bg: #eeecd9; --card-ink: #627459; }
+.difficulty-hard .flow-node.diamond { background: #7e8d75; }
+.difficulty-hard .flow-node.diamond.node-error { background: #aa664e; }
+.difficulty-hard .flow-node.diamond.drop-hover { background: #b37d30; }
+.difficulty-hard .palette-items { gap: 10px; padding-top: 14px; }
+.difficulty-hard .palette-card { min-height: 56px; padding-top: 9px; padding-bottom: 9px; }
 @media (max-width: 1200px) {
   .design-body { grid-template-columns: 220px minmax(0, 1fr); }
   .design-footer-note { display: none; }

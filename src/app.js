@@ -3,13 +3,14 @@
   const H = Hospital;
   const storageKey = 'hospital-bug-mvp-v1';
   const stages = ['intro', 'briefing', 'route1', 'dialogue', 'route2', 'puzzle', 'route3', 'handoff', 'testing', 'complete'];
-  const freshState = () => ({ stage: 'intro', question: 0, order: [...H.initialOrder], branches: { schedule: '', available: '', cancel: '' }, flowSlots: Array(5).fill(null), testDone: [], clientMet: false, storyProgress: { briefing: 0, client: 0, handoff: 0 }, startedAt: 0, completedAt: 0, playerName: '', demo: false });
+  const freshState = (difficulty = 'easy') => ({ stage: 'intro', difficulty: H.normalizeDifficulty(difficulty), question: 0, order: [...H.initialOrder], branches: { schedule: '', available: '', cancel: '' }, flowSlots: Array(5).fill(null), testDone: [], clientMet: false, storyProgress: { briefing: 0, client: 0, handoff: 0 }, startedAt: 0, completedAt: 0, playerName: '', demo: false });
   let state = freshState();
   let storageAvailable = true;
   try {
     const saved = JSON.parse(localStorage.getItem(storageKey) || 'null');
     if (saved && stages.includes(saved.stage)) {
       state = { ...state, ...saved };
+      state.difficulty = H.normalizeDifficulty(saved.difficulty);
       state.question = Math.max(0, Math.min(4, Number.isInteger(saved.question) ? saved.question : 0));
       state.order = Array.isArray(saved.order) && saved.order.length === 5 && new Set(saved.order).size === 5 && saved.order.every(id => Object.hasOwn(H.blocks, id)) ? saved.order : [...H.initialOrder];
       if (!Array.isArray(saved.flowSlots) || saved.flowSlots.length !== 5) state.flowSlots = saved.stage === 'puzzle' ? [...state.order] : Array(5).fill(null);
@@ -22,6 +23,7 @@
       state.demo = saved.demo === true;
     }
   } catch { storageAvailable = false; }
+  let selectedDifficulty = state.difficulty;
 
   const overlay = document.getElementById('overlay');
   let currentScreen = '';
@@ -140,8 +142,9 @@
     showModal('intro', `<div class="shift-hero"><div><div class="modal-eyebrow">МИССИЯ 001 · СБОЙ РАСПИСАНИЯ</div><h2 id="modal-title">Баг в больнице</h2><p class="screen-lead">Игра о профессии системного аналитика</p></div>${portrait('hero')}<svg class="shift-ecg" viewBox="0 0 600 45" aria-hidden="true"><path d="M0 24H180l12-17 15 32 15-24 12 9h366"/></svg></div>
       <p class="screen-intro">К одному врачу на одно время записались сразу трое. В коридорах очереди, главврач требует всё исправить. Ты — аналитик: выясни, что нужно заказчику, и объясни это программисту.</p>
       <div class="shift-features"><div><span>01</span><strong>Поговори</strong><p>Собери требования у заказчика</p></div><div><span>02</span><strong>Спроектируй</strong><p>Построй схему записи и отмены</p></div><div><span>03</span><strong>Проверь</strong><p>Пройди три маршрута и пять сценариев</p></div></div>
+      <fieldset class="difficulty-picker"><legend>Сложность${saved ? ' новой смены' : ''}</legend><p class="difficulty-help">Меняются только вопросы заказчика и подсказки в схеме. Маршруты и управление одинаковые.</p><div class="difficulty-options">${Object.entries(H.difficulties).map(([id, level], index) => `<button type="button" class="difficulty-option" data-action="difficulty" data-difficulty="${id}" aria-pressed="${selectedDifficulty === id}"><span class="difficulty-option-title"><span class="difficulty-bars" aria-hidden="true">${Array.from({ length: 3 }, (_, bar) => `<i class="${bar <= index ? 'lit' : ''}"></i>`).join('')}</span><strong>${level.name}</strong><span class="difficulty-check" aria-hidden="true">✓</span></span><span class="difficulty-detail"><b>Заказчик</b>${level.client}</span><span class="difficulty-detail"><b>Схема</b>${level.designer}</span></button>`).join('')}</div></fieldset>
       <div class="intro-controls"><span><kbd>A</kbd><kbd>D</kbd> идти</span><span><kbd>Пробел</kbd> прыгать</span><span><kbd>E</kbd> взаимодействовать</span></div>
-      ${saved ? '<p class="save-note">Есть сохранённая смена. Можно продолжить с последнего этапа.</p>' : ''}<div class="modal-actions">${button('Управление', 'help', 'secondary')}${saved ? button('Новая смена', 'start', 'secondary') + button('Продолжить →', 'continue', 'dark') : button('Начать смену →', 'start', 'dark')}</div><p class="small-help">Без ограничения попыток · прогресс сохраняется в этом браузере</p>`, true);
+      ${saved ? `<p class="save-note">Сохранённая смена: «${H.difficulties[state.difficulty].name}». «Продолжить» сохранит её сложность и прогресс; выбор выше применяется к новой смене.</p>` : ''}<div class="modal-actions">${button('Управление', 'help', 'secondary')}${saved ? button('Новая смена', 'start', 'secondary') + button('Продолжить →', 'continue', 'dark') : button('Начать смену →', 'start', 'dark')}</div><p class="small-help">Без ограничения попыток · прогресс сохраняется в этом браузере</p>`, true);
   }
 
   function stopTyping() { clearInterval(typingTimer); typingTimer = null; }
@@ -179,7 +182,8 @@
     if (!state.clientMet && state.question === 0 && !feedback) return renderConversation('client');
     if (state.question >= 4 && !feedback) return renderRequirementsSummary();
     const questionIndex = feedback?.correct ? state.question - 1 : state.question;
-    const question = H.questions[questionIndex];
+    const questions = H.getQuestions(state.difficulty);
+    const question = questions[questionIndex];
     const explanation = feedback ? question.explanations[feedback.selected] : '';
     const feedbackHtml = !feedback ? '' : `
       <div class="feedback client-feedback ${feedback.correct ? '' : 'error'}" role="status">
@@ -188,8 +192,8 @@
         ${feedback.correct ? `<div class="accepted-requirement"><strong>Получена карточка ${H.requirements[questionIndex].id}</strong><span>${H.requirements[questionIndex].title}</span></div>` : '<span class="retry-label">Попробуй другой вариант. За ошибки нет штрафа.</span>'}
       </div>`;
     showModal('dialogue', `<div class="client-dialogue">
-      <div class="modal-eyebrow">ВСТРЕЧА С ЗАКАЗЧИКОМ · ЗАДАЧА ${questionIndex + 1} / 4</div>
-      <div class="dialogue-progress">${H.questions.map((_, index) => `<span class="${index < questionIndex ? 'done' : index === questionIndex ? 'active' : ''}"></span>`).join('')}</div>
+      <div class="modal-eyebrow">ВСТРЕЧА С ЗАКАЗЧИКОМ · ЗАДАЧА ${questionIndex + 1} / 4 <span class="difficulty-badge">${H.difficulties[state.difficulty].name}</span></div>
+      <div class="dialogue-progress">${questions.map((_, index) => `<span class="${index < questionIndex ? 'done' : index === questionIndex ? 'active' : ''}"></span>`).join('')}</div>
       <h2 id="modal-title">Сбор требований: ${question.goal.toLowerCase()}</h2>
       <div class="story-dialogue client-request"><div class="story-portrait">${portrait('client')}<strong>Заказчик</strong><small>Елена Сергеевна</small></div><div class="speech-bubble"><p>«${question.speech}»</p></div></div>
       <div class="question-label">${question.question}</div>
@@ -273,14 +277,20 @@
     const target = event.target.closest('[data-action]');
     if (!target || target.disabled) return;
     const action = target.dataset.action;
-    if (action === 'start') { designer.resetSession(); state = freshState(); state.startedAt = Date.now(); system = null; testResults = {}; transition('briefing'); }
+    if (action === 'difficulty' && currentScreen === 'intro') {
+      selectedDifficulty = H.normalizeDifficulty(target.dataset.difficulty);
+      if (state.stage === 'intro') { state.difficulty = selectedDifficulty; save(); }
+      overlay.querySelectorAll('[data-action="difficulty"]').forEach(option => option.setAttribute('aria-pressed', option.dataset.difficulty === selectedDifficulty));
+    }
+    if (action === 'start') { designer.resetSession(); state = freshState(selectedDifficulty); state.startedAt = Date.now(); system = null; testResults = {}; transition('briefing'); }
     if (action === 'continue') renderStage();
     if (action === 'story-next') advanceConversation();
     if (action === 'answer') {
-      if (state.stage !== 'dialogue' || currentScreen !== 'dialogue' || !H.questions[state.question]) return;
+      const question = H.getQuestions(state.difficulty)[state.question];
+      if (state.stage !== 'dialogue' || currentScreen !== 'dialogue' || !question) return;
       const index = Number(target.dataset.index);
       if (!Number.isInteger(index) || index < 0 || index > 2) return;
-      const correct = index === H.questions[state.question].correct;
+      const correct = index === question.correct;
       if (correct) { state.question++; toast(`✓ ${H.requirements[state.question - 1].id} · ${H.requirements[state.question - 1].title}`); }
       save();
       renderDialogue({ correct, selected: index });
@@ -312,7 +322,7 @@
     if (action === 'notebook') openNotebook();
     if (action === 'help') openHelp();
     if (action === 'back') renderScreen(returnScreen);
-    if (action === 'replay') { designer.resetSession(); state = freshState(); system = null; testResults = {}; save(); renderStage(); }
+    if (action === 'replay') { designer.resetSession(); state = freshState(state.difficulty); selectedDifficulty = state.difficulty; system = null; testResults = {}; save(); renderStage(); }
   });
   overlay.addEventListener('input', event => {
     if (event.target.id !== 'certificate-name') return;
@@ -328,7 +338,7 @@
     const value = event.target.value;
     if (!value) return;
     designer.resetSession();
-    state = freshState(); state.demo = true; state.startedAt = Date.now(); system = null; testResults = {};
+    state = freshState(currentScreen === 'intro' ? selectedDifficulty : state.difficulty); selectedDifficulty = state.difficulty; state.demo = true; state.startedAt = Date.now(); system = null; testResults = {};
     if (value === 'platform') state.stage = 'route1';
     if (value === 'dialogue') state.stage = 'dialogue';
     if (value === 'puzzle') { state.stage = 'puzzle'; state.question = 4; }

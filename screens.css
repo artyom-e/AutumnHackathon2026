@@ -89,6 +89,25 @@ body.screen-open { overflow: hidden; }
 .screen-overlay .intro-controls { gap: 20px; flex-wrap: wrap; font-size: 12px; }
 .screen-overlay .intro-controls kbd { font-size: 11px; }
 .screen-overlay .save-note { background: #dfe8d6; border-left: 3px solid #739a78; padding: 10px 12px; margin: 20px 0 0; font-size: 13px; }
+.difficulty-picker { min-width: 0; margin: 23px 0 21px; padding: 0; border: 0; }
+.difficulty-picker legend { padding: 0; margin-bottom: 8px; font: 700 17px "Courier New", monospace; }
+.screen-overlay .difficulty-help { font-size: 12px; margin: 0 0 13px; }
+.difficulty-options { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.difficulty-option { display: flex; flex-direction: column; gap: 12px; min-width: 0; padding: 14px 12px; border: 2px solid #9caa8e; border-radius: 2px; color: #36554b; background: #ecebd9; text-align: left; box-shadow: 2px 2px 0 #c1c8ae; }
+.difficulty-option:hover { background: #e1e8d3; border-color: #6c8c6c; }
+.difficulty-option[aria-pressed="true"] { border-color: #9d6946; background: #eee1bf; box-shadow: 3px 3px 0 #9d6946; }
+.difficulty-option-title { display: flex; align-items: center; gap: 9px; width: 100%; }
+.difficulty-option-title strong { font: 700 16px "Courier New", monospace; }
+.difficulty-bars { display: flex; align-items: flex-end; gap: 3px; height: 16px; }
+.difficulty-bars i { width: 4px; height: 7px; background: #c0c8af; }
+.difficulty-bars i:nth-child(2) { height: 11px; }
+.difficulty-bars i:nth-child(3) { height: 15px; }
+.difficulty-bars i.lit { background: #729374; }
+.difficulty-check { display: grid; place-items: center; width: 20px; height: 20px; margin-left: auto; border: 1px solid #a8b399; color: transparent; font-size: 13px; }
+.difficulty-option[aria-pressed="true"] .difficulty-check { color: #faf5df; background: #47745c; border-color: #365b49; }
+.difficulty-detail { font-size: 11px; line-height: 1.6; color: #64745f; }
+.difficulty-detail b { display: block; margin-bottom: 2px; font-size: 10px; color: #3d5f50; }
+.difficulty-badge { display: inline-block; padding: 3px 7px; margin-left: 6px; border: 1px solid #9dac8e; background: #e1e8d3; color: #53714f; font-size: 10px; letter-spacing: 0; vertical-align: middle; }
 .story-dialogue { display: flex; gap: 20px; align-items: stretch; margin: 25px 0; }
 .story-dialogue.is-me { flex-direction: row-reverse; }
 .story-portrait { flex: 0 0 125px; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; padding: 14px 6px 9px; border: 2px solid #527367; background: #d4dfc8; text-align: center; }
@@ -164,6 +183,11 @@ body.screen-open { overflow: hidden; }
 .help-controls > div { display: flex; align-items: center; gap: 16px; font-size: 14px; }
 .help-controls kbd { width: 90px; flex: none; background: #d9e1cd; color: #33534b; border-color: #97ab8d; padding: 8px; text-align: center; }
 @media (max-width: 620px) {
+  .difficulty-options { grid-template-columns: 1fr; gap: 10px; }
+  .difficulty-option { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 14px; padding: 12px; }
+  .difficulty-option-title { grid-column: 1 / -1; }
+  .difficulty-detail { font-size: 11px; }
+  .difficulty-badge { margin: 5px 0 0; }
   .screen-overlay { padding: 10px; }
   .screen-overlay .game-window { max-height: calc(100dvh - 20px); box-shadow: 4px 4px 0 #071a23; }
   .window-chrome { padding: 8px 11px; font-size: 8px; gap: 7px; }
